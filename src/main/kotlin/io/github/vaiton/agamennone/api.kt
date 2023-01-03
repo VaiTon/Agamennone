@@ -19,30 +19,29 @@ import org.litote.kmongo.lte
 import java.time.LocalDateTime
 
 fun Application.apiModule() {
+    // We need to cache the config here so that it doesn't update while we're setting up
+    val config = ConfigManager.config.value
     install(ContentNegotiation) {
         json()
     }
-    configureAuth()
+    configureAuth(config)
     configureRouting()
 }
 
-private fun Application.configureAuth() {
-    val config = ConfigManager.config.value
+private fun Application.configureAuth(config: Config) {
     val serverPassword = config.serverApiPassword
         ?.takeUnless { it.isEmpty() }
-
-    if (serverPassword == null) {
-        log.debug("No server password set, disabling authentication")
-        return
-    }
 
     log.debug("Enabling authentication...")
     authentication {
         basic("api") {
             realm = "API"
             validate { credentials ->
-                if (credentials.password == serverPassword) {
-                    UserIdPrincipal("api")
+                if (
+                    serverPassword == null // No password set
+                    || credentials.password == serverPassword
+                ) {
+                    UserIdPrincipal("user")
                 } else {
                     null
                 }
