@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "gameName": {
+      "type": "string",
+      "description": "The name of the competition"
+    },
+    "flagLifetime": {
+      "type": "integer",
+      "description": "The number of seconds a flag is valid for"
+    },
+    "flagRegex": {
+      "type": "string",
+      "format": "regex",
+      "description": "The regex that flags must match"
+    },
+    "submissionProtocol": {
+      "type": "string",
+      "enum": [
+        "ENOWARS",
+        "EXTERNAL"
+      ]
+    },
+    "submissionHost": {
+      "type": "string",
+      "format": [
+        "ipv4",
+        "ipv6"
+      ]
+    },
+    "submissionPort": {
+      "type": "integer"
+    },
+    "submissionSendsWelcomeBanner": {
+      "type": "boolean",
+      "description": "Whether the submission service sends a welcome banner"
+    },
+    "submissionPeriod": {
+      "type": "integer",
+      "description": "The number of seconds between submissions"
+    },
+    "submissionFlagLimit": {
+      "type": "integer",
+      "description": "The number of flags a submitter can submit in a single cycle"
+    },
+    "submissionPath": {
+      "type": "string",
+      "description": "If the submission service is via HTTP, the path to the submission service"
+    },
+    "submissionExePath": {
+      "type": "string",
+      "description": "If submissionProtocol is set to EXTERNAL, the path to the submission executable"
+    },
+    "serverHost": {
+      "type": "string",
+      "format": [
+        "ipv4",
+        "ipv6"
+      ],
+      "description": "The IP which this server will bind to"
+    },
+    "serverPort": {
+      "type": "integer",
+      "description": "The port which this server will bind to"
+    },
+    "serverApiPassword": {
+      "type": "string",
+      "description": "Optional HTTP Basic password required to send requests to this server"
+    }
+  },
+  "required": [
+    "gameName",
+    "flagRegex",
+    "submissionProtocol",
+    "submissionHost",
+    "submissionPort",
+    "serverHost",
+    "serverPort"
+  ]
+}

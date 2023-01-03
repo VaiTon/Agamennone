@@ -1,0 +1,76 @@
+[versions]
+ktor_version = "2.2.1"
+kotlin_version = "1.8.0"
+kmongo_version = "4.8.0"
+logback_version = "1.4.5"
+prometheus_simpleclient_version = "0.16.0"
+kotlin_logging_version = "3.0.4"
+kotlinx_coroutines_version = "1.6.4"
+jsonpath_version = "2.7.0"
+
+[libraries]
+ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor_version" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor_version" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor_version" }
+ktor-server-auth-jvm = { module = "io.ktor:ktor-server-auth-jvm", version.ref = "ktor_version" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor_version" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor_version" }
+ktor-server-tests-jvm = { module = "io.ktor:ktor-server-tests-jvm", version.ref = "ktor_version" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor_version" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor_version" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor_version" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor_version" }
+
+kmongo-coroutine = { module = "org.litote.kmongo:kmongo-coroutine", version.ref = "kmongo_version" }
+
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback_version" }
+logback-core = { module = "ch.qos.logback:logback-core", version.ref = "logback_version" }
+
+prometheus-simpleclient = { module = "io.prometheus:simpleclient", version.ref = "prometheus_simpleclient_version" }
+prometheus-simpleclient_common = { module = "io.prometheus:simpleclient_common", version.ref = "prometheus_simpleclient_version" }
+
+kotlin-logging-jvm = { module = "io.github.microutils:kotlin-logging-jvm", version.ref = "kotlin_logging_version" }
+
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin_version" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin_version" }
+
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx_coroutines_version" }
+
+jsonpath = { module = "com.jayway.jsonpath:json-path", version.ref = "jsonpath_version" }
+
+[bundles]
+ktor-server = [
+    "ktor-server-core",
+    "ktor-server-netty",
+    "ktor-server-auth",
+    "ktor-server-auth-jvm",
+    "ktor-server-content-negotiation",
+]
+ktor-client = [
+    "ktor-client-core",
+    "ktor-client-cio",
+    "ktor-client-content-negotiation"
+]
+logback = [
+    "logback-classic",
+    "logback-core"
+]
+
+prometheus = [
+    "prometheus-simpleclient",
+    "prometheus-simpleclient_common"
+]
+
+test = [
+    "kotlin-test",
+    "kotlin-test-junit",
+    "kotlinx-coroutines-test",
+    "ktor-server-test-host",
+    "ktor-server-tests-jvm"
+]
+
+
+[plugins]
+ktor = { id = "io.ktor.plugin", version.ref = "ktor_version" }
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin_version" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin_version" }

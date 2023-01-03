@@ -1,0 +1,10 @@
+{
+  "$schema": "config.schema.json",
+  "gameName": "My Game",
+  "flagRegex": "flag{.*}",
+  "submissionProtocol": "ENOWARS",
+  "submissionHost": "10.0.0.1",
+  "submissionPort": 663,
+  "serverHost": "0.0.0.0",
+  "serverPort": 8081
+}
