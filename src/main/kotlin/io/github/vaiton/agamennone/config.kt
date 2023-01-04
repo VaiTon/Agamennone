@@ -43,7 +43,6 @@ data class Config(
 
     val serverHost: String,
     val serverPort: Int,
-    val serverApiPassword: String? = null,
 )
 
 @OptIn(ExperimentalSerializationApi::class)

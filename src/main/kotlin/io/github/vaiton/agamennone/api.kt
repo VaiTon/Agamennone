@@ -6,7 +6,6 @@ import io.github.vaiton.agamennone.model.PartialFlag
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -19,51 +18,24 @@ import org.litote.kmongo.lte
 import java.time.LocalDateTime
 
 fun Application.apiModule() {
-    // We need to cache the config here so that it doesn't update while we're setting up
-    val config = ConfigManager.config.value
     install(ContentNegotiation) {
         json()
     }
-    configureAuth(config)
     configureRouting()
-}
-
-private fun Application.configureAuth(config: Config) {
-    val serverPassword = config.serverApiPassword
-        ?.takeUnless { it.isEmpty() }
-
-    log.debug("Enabling authentication...")
-    authentication {
-        basic("api") {
-            realm = "API"
-            validate { credentials ->
-                if (
-                    serverPassword == null // No password set
-                    || credentials.password == serverPassword
-                ) {
-                    UserIdPrincipal("user")
-                } else {
-                    null
-                }
-            }
-        }
-    }
-    log.debug("Authentication enabled.")
 }
 
 private fun Application.configureRouting() {
     routing {
-        authenticate("api") {
-            route("api") {
-                prometheus()
-                index()
-                route("flags") {
-                    getFlags()
-                    postFlags()
-                }
-                getConfig()
+        route("api") {
+            prometheus()
+            index()
+            route("flags") {
+                getFlags()
+                postFlags()
             }
+            getConfig()
         }
+
     }
 }
 

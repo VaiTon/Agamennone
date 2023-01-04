@@ -63,10 +63,6 @@
     "serverPort": {
       "type": "integer",
       "description": "The port which this server will bind to"
-    },
-    "serverApiPassword": {
-      "type": "string",
-      "description": "Optional HTTP Basic password required to send requests to this server"
     }
   },
   "required": [

@@ -11,8 +11,6 @@ jsonpath_version = "2.7.0"
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor_version" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor_version" }
-ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor_version" }
-ktor-server-auth-jvm = { module = "io.ktor:ktor-server-auth-jvm", version.ref = "ktor_version" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor_version" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor_version" }
 ktor-server-tests-jvm = { module = "io.ktor:ktor-server-tests-jvm", version.ref = "ktor_version" }
@@ -42,8 +40,6 @@ jsonpath = { module = "com.jayway.jsonpath:json-path", version.ref = "jsonpath_v
 ktor-server = [
     "ktor-server-core",
     "ktor-server-netty",
-    "ktor-server-auth",
-    "ktor-server-auth-jvm",
     "ktor-server-content-negotiation",
 ]
 ktor-client = [
