@@ -26,7 +26,15 @@ object EnoWars : SubmissionProtocol {
     ) = withContext(Dispatchers.IO) {
         // The client connects to the server on a TCP port specified by
         // the respective CTF.
-        log.debug { "Connecting to ${config.submissionHost}:${config.submissionPath}" }
+        log.debug {
+            buildString {
+                append("Connecting to ${config.submissionHost}:${config.submissionPort}")
+                append(" with ${flags.size} flags")
+                if (config.submissionPath != null) {
+                    append(" and path ${config.submissionPath}")
+                }
+            }
+        }
         val socket = Socket(
             /* host = */ config.submissionHost,
             /* port = */ config.submissionPort,
@@ -78,7 +86,7 @@ object EnoWars : SubmissionProtocol {
         // - Optionally: Whitespace, followed by a custom message consisting of any characters except newlines
         // - Newline
 
-        val line = reader.readLine() ?: error("Server closed connection")
+        val line = reader.readLine() ?: throw IOException("Server closed connection")
         log.debug { "Received response '$line'" }
 
         val parts = line.split(WHITESPACE)
@@ -87,7 +95,7 @@ object EnoWars : SubmissionProtocol {
             "OK" -> FlagStatus.ACCEPTED
             "DUP", "OWN", "OLD" -> FlagStatus.SKIPPED
             "INV", "ERR" -> FlagStatus.REJECTED
-            else -> error("Unknown response code: $responseCode")
+            else -> throw IllegalStateException("Unknown response code: $responseCode")
         }
 
         val message = parts.getOrNull(2)?.trim()

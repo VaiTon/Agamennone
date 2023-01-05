@@ -34,11 +34,11 @@ data class Config(
     val submissionExePath: String? = null,
 
     val flagInfoUrl: String? = null,
-    val flagInfoQuery: String? = null,
+    val flagInfoQuery: String = "",
     val flagInfoRefreshPeriod: Int = 30,
 
     val teamsInfoUrl: String? = null,
-    val teamsInfoQuery: String? = null,
+    val teamsInfoQuery: String = "",
     val teamsInfoRefreshPeriod: Int = 30,
 
     val serverHost: String,

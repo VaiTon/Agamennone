@@ -13,15 +13,33 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromStream
 import mu.KotlinLogging
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.inputStream
+import kotlin.reflect.KProperty1
 import kotlin.time.Duration.Companion.seconds
 
 
 object GameServerInfoUpdater {
-    private val _teams = MutableStateFlow<List<Team>?>(null)
+    private val _teams = MutableStateFlow(getInitialTeams())
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun getInitialTeams(): List<Team> {
+        val teamsFile = Path("teams.json").takeIf { it.exists() } ?: error("No teams.json file found")
+        val teamsMap = teamsFile.inputStream().use { stream ->
+            Json.decodeFromStream<Map<String, String>>(stream)
+        }
+        return teamsMap.map { (name, ip) -> Team(name, ip) }
+    }
+
     val teams = _teams.asStateFlow()
 
-    private val _flagInfo = MutableStateFlow<Any?>(null)
+    private val _flagInfo = MutableStateFlow<JsonElement?>(null)
     val flagInfo = _flagInfo.asStateFlow()
 
     private val log = KotlinLogging.logger {}
@@ -31,7 +49,7 @@ object GameServerInfoUpdater {
 
     suspend fun startUpdaters() {
         withContext(Dispatchers.Default) {
-            launch { updateTeams() }
+            launch { updateTeamsInfo() }
             launch { updateFlagInfo() }
         }
     }
@@ -40,49 +58,52 @@ object GameServerInfoUpdater {
      * WARNING: This coroutine runs forever.
      */
     private suspend fun updateFlagInfo() {
-        while (true) {
-            val config = ConfigManager.config.value
-            val flagInfoUrl = config.flagInfoUrl
-            if (flagInfoUrl == null) {
-                log.trace { "No flag info URL provided. Not providing flag info." }
-                return
-            }
-            val flagInfoQuery = checkNotNull(config.flagInfoQuery) { "flagInfoQuery is not set in config" }
-            val flagInfoPeriod =
-                checkNotNull(config.flagInfoRefreshPeriod) { "flagInfoRefreshPeriod is not set in config" }
-
-            val response = client.get(flagInfoUrl).bodyAsText()
-
-            val result: Any = JsonPath.parse(response).read(flagInfoQuery)
-            _flagInfo.value = result
-
-            delay(flagInfoPeriod.seconds)
-        }
+        _flagInfo.updateGenericInfo(
+            urlProperty = Config::flagInfoUrl,
+            queryProperty = Config::flagInfoQuery,
+            periodProperty = Config::flagInfoRefreshPeriod,
+        )
     }
 
     /**
      * WARNING: This coroutine runs forever.
      */
-    private suspend fun updateTeams() {
+    private suspend fun updateTeamsInfo() {
+        _teams.updateGenericInfo(
+            urlProperty = Config::teamsInfoUrl,
+            queryProperty = Config::teamsInfoQuery,
+            periodProperty = Config::teamsInfoRefreshPeriod
+        )
+    }
+
+    private suspend fun <T> MutableStateFlow<T>.updateGenericInfo(
+        urlProperty: KProperty1<Config, String?>,
+        queryProperty: KProperty1<Config, String>,
+        periodProperty: KProperty1<Config, Int>,
+    ) {
         while (true) {
-            // Update config
             val config = ConfigManager.config.value
-            // Get team query
-            val teamsInfoUrl = config.teamsInfoUrl
-            if (teamsInfoUrl == null) {
-                log.trace { "No teams provided. Not providing team info." }
+            val url = urlProperty.get(config)
+            if (url == null) {
+                log.debug { "${urlProperty.name} not provided. Not providing info." }
                 return
             }
-            val teamsInfoQuery = checkNotNull(config.teamsInfoQuery) { "teamsInfoUrl is not set in config" }
-            val teamsInfoPeriod =
-                checkNotNull(config.teamsInfoRefreshPeriod) { "teamsInfoRefreshPeriod is not set in config" }
+            val query =
+                checkNotNull(queryProperty.get(config)) { "${queryProperty.name} is not set in config" }
+            val updatePeriod =
+                checkNotNull(periodProperty.get(config)) { "${periodProperty.name} is not set in config" }
 
-            val response = client.get(teamsInfoUrl).bodyAsText()
+            val response = client.get(url).bodyAsText()
 
-            val result: List<Team>? = JsonPath.parse(response).read(teamsInfoQuery)
-            _teams.value = result
+            val result: T? = JsonPath.parse(response).read<T>(query) // FIXME: This will never work...
+            if (result == null) {
+                log.warn { "Could not parse response from $url" }
+            } else {
+                log.debug { "Updating ${this@updateGenericInfo}" }
+                this.value = result
+            }
 
-            delay(teamsInfoPeriod.seconds)
+            delay(updatePeriod.seconds)
         }
     }
 }

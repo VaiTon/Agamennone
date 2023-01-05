@@ -1,5 +1,6 @@
 package io.github.vaiton.agamennone
 
+import io.github.vaiton.agamennone.compatibility.DestructiveFarm
 import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
 import io.github.vaiton.agamennone.model.PartialFlag
@@ -26,16 +27,15 @@ fun Application.apiModule() {
 
 private fun Application.configureRouting() {
     routing {
+        index()
+        prometheus()
         route("api") {
-            prometheus()
-            index()
+            getConfig()
             route("flags") {
                 getFlags()
                 postFlags()
             }
-            getConfig()
         }
-
     }
 }
 
@@ -47,16 +47,15 @@ private fun Route.index() {
 
 private fun Route.getConfig() = get("config") {
     val config = ConfigManager.config.value
-    val teams = GameServerInfoUpdater.teams.value
     val flagInfo = GameServerInfoUpdater.flagInfo.value
+    val teams = GameServerInfoUpdater.teams.value
 
-    val clientConfig = buildMap {
-        put("flagRegex", config.flagRegex)
-        teams?.let { put("teams", it) }
-        flagInfo?.let { put("flagInfo", it) }
+    if (call.request.queryParameters.contains("new")) {
+        TODO("New Client-Server Protocol not implemented yet")
+    } else {
+        // Compatibility with old clients
+        call.respond(DestructiveFarm.getDestructiveFarmClientRequest(config, teams, flagInfo))
     }
-
-    call.respond(clientConfig)
 }
 
 private fun Route.getFlags() = get {

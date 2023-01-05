@@ -32,9 +32,9 @@ object Submitter {
             Metrics.setQueuedFlags(queuedFlags.size)
 
             val toSubmit = queuedFlags.take(config.submissionFlagLimit)
-            log.info { "Submitting ${toSubmit.size} flags (out of ${queuedFlags.size} queued)." }
 
             if (queuedFlags.isNotEmpty()) {
+                log.info { "Submitting ${toSubmit.size} flags (out of ${queuedFlags.size} queued)." }
                 submitFlags(toSubmit, config)
             }
 
@@ -74,11 +74,13 @@ object Submitter {
         val submitterProtocol = config.submissionProtocol
         val protocol = SubmissionProtocol.getProtocol(submitterProtocol)
 
-        val submittedFlags = protocol.submitFlags(flags, config)
+        val submittedFlags = kotlin.runCatching { protocol.submitFlags(flags, config) }
+            .onFailure { log.error(it) { "Error while submitting flags." } }
+            .getOrDefault(emptyList())
 
         submittedFlags.forEach { flag ->
             FlagDatabase.setFlagResponse(flag)
-            Metrics.incrementFlagStatus(flag.status, flag.exploit, flag.team)
+            Metrics.incrementFlagStatus(flag.status, flag.sploit, flag.team)
             log.debug { "Submitted flag '${flag.flag}' with status ${flag.status}" }
         }
 

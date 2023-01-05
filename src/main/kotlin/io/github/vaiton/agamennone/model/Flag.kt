@@ -6,7 +6,7 @@ import java.time.LocalDateTime
 @Serializable
 data class Flag(
     val flag: String,
-    val exploit: String,
+    val sploit: String,
     val team: String,
     @Serializable(with = LocalDateTimeSerializer::class)
     val receivedTime: LocalDateTime,
