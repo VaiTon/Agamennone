@@ -13,5 +13,7 @@ data class Flag(
     val status: FlagStatus,
     val checkSystemResponse: String? = null,
     val sentCycle: Int? = null,
-)
+) {
+    fun isValid(regex: Regex) = flag.isNotBlank() && flag.matches(regex)
+}
 

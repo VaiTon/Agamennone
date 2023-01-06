@@ -1,36 +1,58 @@
 package io.github.vaiton.agamennone.compatibility
 
 import io.github.vaiton.agamennone.Config
+import io.github.vaiton.agamennone.ConfigManager
+import io.github.vaiton.agamennone.model.Flag
+import io.github.vaiton.agamennone.model.FlagStatus
 import io.github.vaiton.agamennone.model.Team
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.encodeToJsonElement
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.util.pipeline.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import org.jetbrains.annotations.Contract
+import java.time.LocalDateTime
 
-object DestructiveFarm {
-
-    fun getDestructiveFarmClientRequest(
+internal object DestructiveFarm {
+    @Contract(pure = true)
+    fun clientConfig(
         config: Config,
         teams: List<Team>,
         flagInfo: JsonElement?,
-    ): JsonObject {
-        val flagFormatJson = Json.encodeToJsonElement(config.flagRegex)
-        val flagLifetimeJson = Json.encodeToJsonElement(config.flagLifetime)
-        val submitPeriodJson = Json.encodeToJsonElement(config.submissionPeriod)
-
-        val teamsMap: Map<String, String> = teams.associate { it.name to it.ip }
-        val teamsJson = Json.encodeToJsonElement(teamsMap)
-
-        val flagInfoJson = Json.encodeToJsonElement(flagInfo)
-
-        return JsonObject(
-            buildMap {
-                put("FLAG_FORMAT", flagFormatJson)
-                put("SUBMIT_PERIOD", submitPeriodJson)
-                put("FLAG_LIFETIME", flagLifetimeJson)
-                put("TEAMS", teamsJson)
-                put("ATTACK_INFO", flagInfoJson)
+    ): JsonObject = buildJsonObject {
+        put("FLAG_FORMAT", config.flagRegex)
+        put("SUBMIT_PERIOD", config.submissionPeriod)
+        put("FLAG_LIFETIME", config.flagLifetime)
+        putJsonObject("TEAMS") {
+            teams.forEach { team ->
+                put(team.name, team.ip)
             }
-        )
+        }
+        flagInfo?.let { put("ATTACK_INFO", it) }
+    }
+    @Serializable
+    private data class PartialFlag(
+        val flag: String,
+        val sploit: String,
+        val team: String
+    )
+    suspend fun clientFlags(context: PipelineContext<Unit, ApplicationCall>): List<Flag>? {
+        val receivedTime = LocalDateTime.now()
+
+        val config = ConfigManager.config.value
+        val flagRegex = config.flagRegex.toRegex()
+
+        val partialFlags = kotlin.runCatching {
+            context.call.receive<List<PartialFlag>>()
+        }.getOrElse {
+            context.call.respond(HttpStatusCode.BadRequest, "Invalid request body")
+            return null
+        }
+
+        return partialFlags
+            .map { Flag(it.flag, it.sploit, it.team, receivedTime, FlagStatus.QUEUED) }
+            .filter { it.isValid(flagRegex) }
     }
 }

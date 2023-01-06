@@ -1,9 +1,9 @@
 {
   "$schema": "config.schema.json",
   "gameName": "My Game",
-  "flagRegex": "flag{.*}",
+  "flagRegex": "[a-zA-Z0-9]{31}=",
   "submissionProtocol": "ENOWARS",
-  "submissionHost": "10.0.0.1",
+  "submissionHost": "127.0.0.1",
   "submissionPort": 663,
   "serverHost": "0.0.0.0",
   "serverPort": 8081

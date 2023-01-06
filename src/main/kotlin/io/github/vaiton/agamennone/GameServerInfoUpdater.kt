@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromStream
@@ -25,7 +26,7 @@ import kotlin.reflect.KProperty1
 import kotlin.time.Duration.Companion.seconds
 
 
-object GameServerInfoUpdater {
+internal object GameServerInfoUpdater {
     private val _teams = MutableStateFlow(getInitialTeams())
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -76,7 +77,7 @@ object GameServerInfoUpdater {
         )
     }
 
-    private suspend fun <T> MutableStateFlow<T>.updateGenericInfo(
+    private suspend inline fun <reified T> MutableStateFlow<T>.updateGenericInfo(
         urlProperty: KProperty1<Config, String?>,
         queryProperty: KProperty1<Config, String>,
         periodProperty: KProperty1<Config, Int>,
@@ -95,7 +96,10 @@ object GameServerInfoUpdater {
 
             val response = client.get(url).bodyAsText()
 
-            val result: T? = JsonPath.parse(response).read<T>(query) // FIXME: This will never work...
+            val result: T? = Json.decodeFromString(
+                JsonPath.parse(response).read<Any>(query).toString()
+            ) // FIXME: This will never work...
+
             if (result == null) {
                 log.warn { "Could not parse response from $url" }
             } else {
