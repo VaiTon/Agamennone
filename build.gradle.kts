@@ -33,8 +33,6 @@ dependencies {
     implementation(libs.jsonpath)
     implementation(libs.kmongo.coroutine)
     implementation(libs.kotlin.logging.jvm)
-    implementation("io.ktor:ktor-client-content-negotiation:2.2.1")
-    implementation("io.ktor:ktor-serialization-jackson:2.2.1")
 
     // Test
     testImplementation(libs.bundles.test)
