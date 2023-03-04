@@ -1,9 +1,18 @@
-# Development
+
+# Agamennone
+
+Agamennone is a simple, resilient and scalable flag submission system.
+It is designed to be simple but extensible.
+
+Built with [Kotlin](https://kotlinlang.org/), [Ktor](https://ktor.io/) and 
+
+
+## Development
 
 1. Clone the repository
 2. Run `./gradlew run` to start the server
 
-# Building
+## Building
 
 The project can be built with:
 
