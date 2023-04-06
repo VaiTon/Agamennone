@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 @Suppress("DSL_SCOPE_VIOLATION") // See https://github.com/gradle/gradle/issues/22797
 
 plugins {
@@ -40,9 +42,18 @@ dependencies {
 
 kotlin {
     jvmToolchain(17)
+
+    sourceSets.all {
+        languageSettings {
+            languageVersion = "2.0"
+        }
+    }
 }
 
 application {
     mainClass.set("io.github.vaiton.agamennone.ApplicationKt")
 }
 
+tasks.compileKotlin {
+    compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+}
