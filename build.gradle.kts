@@ -35,6 +35,7 @@ dependencies {
     implementation(libs.jsonpath)
     implementation(libs.kmongo.coroutine)
     implementation(libs.kotlin.logging.jvm)
+    implementation("io.ktor:ktor-server-cors-jvm:2.2.4")
 
     // Test
     testImplementation(libs.bundles.test)

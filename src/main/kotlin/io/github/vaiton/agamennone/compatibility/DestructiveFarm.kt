@@ -30,14 +30,16 @@ internal object DestructiveFarm {
                 put(team.name, team.ip)
             }
         }
-        flagInfo?.let { put("ATTACK_INFO", it) }
+        put("ATTACK_INFO", flagInfo ?: JsonObject(emptyMap()))
     }
+
     @Serializable
     private data class PartialFlag(
         val flag: String,
         val sploit: String,
-        val team: String
+        val team: String,
     )
+
     suspend fun clientFlags(context: PipelineContext<Unit, ApplicationCall>): List<Flag>? {
         val receivedTime = LocalDateTime.now()
 
