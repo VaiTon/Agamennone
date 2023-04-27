@@ -4,7 +4,7 @@
 Agamennone is a simple, resilient and scalable flag submission system.
 It is designed to be simple but extensible.
 
-Built with [Kotlin](https://kotlinlang.org/), [Ktor](https://ktor.io/) and 
+Built with [Kotlin](https://kotlinlang.org/), [Ktor](https://ktor.io/) and [Exposed](https://github.com/JetBrains/Exposed).
 
 
 ## Development

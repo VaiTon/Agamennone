@@ -1,18 +1,17 @@
 package io.github.vaiton.agamennone.api
 
-import io.github.vaiton.agamennone.FlagDatabase
 import io.github.vaiton.agamennone.compatibility.DestructiveFarm
 import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
+import io.github.vaiton.agamennone.model.Flags
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.bson.conversions.Bson
-import org.litote.kmongo.and
-import org.litote.kmongo.eq
-import org.litote.kmongo.gte
-import org.litote.kmongo.lte
+import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.LocalDateTime
 
 internal fun Route.flagRoutes() {
@@ -22,37 +21,60 @@ internal fun Route.flagRoutes() {
     }
 }
 
+@Serializable
+data class FlagsResponse(
+    val flag: String,
+    val sploit: String,
+    val team: String,
+    val receivedTime: String,
+    val status: FlagStatus,
+    val checkSystemResponse: String?,
+    val sentCycle: Int?,
+) {
+    constructor(flag: Flag) : this(
+        flag.flag,
+        flag.sploit,
+        flag.team,
+        flag.receivedTime.toString(),
+        flag.status,
+        flag.checkSystemResponse,
+        flag.sentCycle,
+    )
+}
+
 private fun Route.getFlags() = get {
-    val conditions = mutableListOf<Bson>()
+    var filter: Op<Boolean> = Op.TRUE
     call.request.queryParameters["from_cycle"]?.toIntOrNull()?.let {
-        conditions += Flag::sentCycle gte it
+        filter = filter.and { Flags.sentCycle greaterEq it }
     }
     call.request.queryParameters["to_cycle"]?.toIntOrNull()?.let {
-        conditions += Flag::sentCycle lte it
+        filter = filter.and { Flags.sentCycle lessEq it }
     }
     call.request.queryParameters["from_time"]?.let {
-        conditions += Flag::receivedTime gte LocalDateTime.parse(it)
+        filter = filter.and { Flags.receivedTime greaterEq LocalDateTime.parse(it) }
     }
     call.request.queryParameters["to_time"]?.let {
-        conditions += Flag::receivedTime lte LocalDateTime.parse(it)
+        filter = filter.and { Flags.receivedTime lessEq LocalDateTime.parse(it) }
     }
     call.request.queryParameters["team"]?.let {
-        conditions += Flag::team eq it
+        filter = filter.and { Flags.team eq it }
     }
     call.request.queryParameters["status"]?.let {
-        conditions += Flag::status eq FlagStatus.valueOf(it)
+        filter = filter.and { Flags.status eq FlagStatus.valueOf(it) }
     }
     val limit = call.request.queryParameters["limit"]?.toIntOrNull()
-    val filter = and(conditions)
-    val flags = FlagDatabase.getFlags(filter, limit)
 
+
+    val flags = newSuspendedTransaction {
+        Flag.find(filter)
+            .apply { if (limit != null) limit(limit) }
+            .map(::FlagsResponse)
+    }
     call.respond(flags)
 }
 
 private fun Route.postFlags() = post {
-    val flags = DestructiveFarm.clientFlags(this) ?: return@post
-
-    val insertedFlags = FlagDatabase.addFlags(flags)
-    call.respond(HttpStatusCode.Created, insertedFlags)
+    DestructiveFarm.clientFlags(this)
+    call.respond(HttpStatusCode.Created)
 }
 

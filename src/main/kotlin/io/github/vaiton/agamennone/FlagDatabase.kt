@@ -2,39 +2,43 @@ package io.github.vaiton.agamennone
 
 import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
-import org.bson.conversions.Bson
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
-import org.litote.kmongo.coroutine.coroutine
-import org.litote.kmongo.reactivestreams.KMongo
+import io.github.vaiton.agamennone.model.Flags
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.transactions.transaction
+import java.sql.Connection
 import java.time.LocalDateTime
 
 object FlagDatabase {
 
-    private lateinit var collection: CoroutineCollection<Flag>
-
     fun init() {
-        val client = KMongo.createClient().coroutine
-        val database = client.getDatabase("agamennone")
-        collection = database.getCollection()
+        Database.connect("jdbc:sqlite:./data.db", "org.sqlite.JDBC")
+        TransactionManager.manager.defaultIsolationLevel =
+            Connection.TRANSACTION_SERIALIZABLE
+
+        // print sql to std-out
+        transaction {
+            addLogger(StdOutSqlLogger)
+        }
+
+        transaction {
+            SchemaUtils.create(Flags)
+        }
     }
 
-    /**
-     * @return the number of flags inserted
-     */
-    suspend fun addFlags(flags: List<Flag>): Int {
-        val result = collection.insertMany(flags)
-        return result.insertedIds.count()
-    }
 
     /**
      * @return the latest cycle, or null if the database is empty
      */
     suspend fun getMaxCycle(): Int? {
-        return collection.find()
-            .descendingSort(Flag::sentCycle)
-            .first()
-            ?.sentCycle
+        return newSuspendedTransaction {
+            Flag.all()
+                .limit(1)
+                .sortedByDescending { it.sentCycle }
+                .firstOrNull()
+                ?.sentCycle
+        }
     }
 
     /**
@@ -43,39 +47,31 @@ object FlagDatabase {
      *
      * @return the number of flags that were skipped.
      */
-    suspend fun skipOldFlags(before: LocalDateTime): Long {
-        val update = collection.updateMany(
-            and(
-                Flag::receivedTime lt before,
-                Flag::status eq FlagStatus.QUEUED
-            ),
-            Flag::status setTo FlagStatus.SKIPPED
-        )
-        return update.modifiedCount
+    suspend fun skipOldFlags(before: LocalDateTime): Int {
+        return newSuspendedTransaction {
+            Flags.update({
+                (Flags.receivedTime less before) and (Flags.status eq FlagStatus.QUEUED)
+            }) {
+                it[status] = FlagStatus.SKIPPED
+            }
+        }
     }
 
     /**
      * @return all the flags with [Flag.status] [FlagStatus.QUEUED]
      */
-    suspend fun getQueuedFlags(): List<Flag> = collection
-        .find(Flag::status eq FlagStatus.QUEUED)
-        .toList()
+    suspend fun getQueuedFlags(): List<Flag> = newSuspendedTransaction {
+        Flag.find { Flags.status eq FlagStatus.QUEUED }.toList()
+    }
 
 
     suspend fun setFlagResponse(flag: Flag) {
-        collection.updateOne(
-            Flag::flag eq flag.flag,
-            set(
-                Flag::status setTo flag.status,
-                Flag::checkSystemResponse setTo flag.checkSystemResponse
-            )
-        )
-    }
-
-    suspend fun getFlags(filter: Bson, limit: Int? = null): List<Flag> {
-        return collection.find(filter)
-            .apply { if (limit != null) limit(limit) }
-            .toList()
+        newSuspendedTransaction {
+            Flag.find { Flags.flag eq flag.flag }.firstOrNull()?.apply {
+                status = flag.status
+                checkSystemResponse = flag.checkSystemResponse
+            }
+        }
     }
 
 }

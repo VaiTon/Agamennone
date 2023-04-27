@@ -62,17 +62,27 @@ object EnoWars : SubmissionProtocol {
         }
 
         // Send flags and read responses
-        val result = flags.map { sendFlag(writer, reader, it) }
+        val result = flags.map { flag ->
+            val (status, response) = sendFlag(writer, reader, flag)
+            flag.status = status
+            flag.checkSystemResponse = response
+            flag
+        }
 
         socket.close()
         result
     }
 
+    data class CheckServerResponse(
+        val status: FlagStatus,
+        val message: String,
+    )
+
     private fun sendFlag(
         writer: OutputStreamWriter,
         reader: BufferedReader,
         flag: Flag,
-    ): Flag {
+    ): CheckServerResponse {
         // To submit a flag, the client MUST send the flag followed by a single newline.
         writer.write(flag.flag + "\n")
         writer.flush()
@@ -99,10 +109,8 @@ object EnoWars : SubmissionProtocol {
         }
 
         val message = parts.getOrNull(2)?.trim()
-        return flag.copy(
-            status = status,
-            checkSystemResponse = "$responseCode $message"
-        )
+
+        return CheckServerResponse(status, "$responseCode $message")
     }
 
     private fun readWelcomeBanner(reader: BufferedReader): String {

@@ -2,17 +2,17 @@ package io.github.vaiton.agamennone.compatibility
 
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.ConfigManager
-import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
+import io.github.vaiton.agamennone.model.Flags
 import io.github.vaiton.agamennone.model.Team
-import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.annotations.Contract
+import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.LocalDateTime
 
 internal object DestructiveFarm {
@@ -40,21 +40,25 @@ internal object DestructiveFarm {
         val team: String,
     )
 
-    suspend fun clientFlags(context: PipelineContext<Unit, ApplicationCall>): List<Flag>? {
+    suspend fun clientFlags(context: PipelineContext<Unit, ApplicationCall>) {
         val receivedTime = LocalDateTime.now()
 
         val config = ConfigManager.config.value
         val flagRegex = config.flagRegex.toRegex()
 
-        val partialFlags = kotlin.runCatching {
-            context.call.receive<List<PartialFlag>>()
-        }.getOrElse {
-            context.call.respond(HttpStatusCode.BadRequest, "Invalid request body")
-            return null
-        }
+        val partialFlags = context.call.receive<List<PartialFlag>>()
+            .filter { flagRegex.matches(it.flag) } // Only accept valid flags
 
-        return partialFlags
-            .map { Flag(it.flag, it.sploit, it.team, receivedTime, FlagStatus.QUEUED) }
-            .filter { it.isValid(flagRegex) }
+
+        // Insert flags into database
+        newSuspendedTransaction {
+            Flags.batchInsert(partialFlags) {
+                this[Flags.flag] = it.flag
+                this[Flags.sploit] = it.sploit
+                this[Flags.team] = it.team
+                this[Flags.receivedTime] = receivedTime
+                this[Flags.status] = FlagStatus.QUEUED
+            }
+        }
     }
 }

@@ -29,12 +29,13 @@ dependencies {
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.logback)
     implementation(libs.bundles.prometheus)
+    implementation(libs.bundles.exposed)
 
     // Single libraries
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.jsonpath)
-    implementation(libs.kmongo.coroutine)
     implementation(libs.kotlin.logging.jvm)
+
 
     // Test
     testImplementation(libs.bundles.test)

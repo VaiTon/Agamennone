@@ -17,7 +17,7 @@ object Metrics {
         "flags_queued", "Number of queued flags"
     ).register()
 
-    fun setQueuedFlags(value: Int) {
+    fun setQueuedFlags(value: Number) {
         QUEUED_FLAGS.set(value.toDouble())
     }
 
@@ -25,7 +25,7 @@ object Metrics {
         "flags_timed_out", "Number of skipped flags"
     ).register()
 
-    fun incrementTimedOutFlags(inc: Long) {
+    fun incrementTimedOutFlags(inc: Number) {
         TIMED_OUT_FLAGS.inc(inc.toDouble())
     }
 
