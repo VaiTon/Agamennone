@@ -43,7 +43,7 @@ class CyberChallengeIT : SubmissionProtocol {
                 ?.key
                 ?: throw IllegalStateException("Cannot map message to a FlagStatus: '${msgTrimmed}'")
 
-            emit(SubmissionResult(flag = response.flag, status = status, message = msgTrimmed))
+            emit(SubmissionResult(flag = response.flag, status = status, checkSystemResponse = msgTrimmed))
         }
     }
 

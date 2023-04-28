@@ -3,6 +3,7 @@ package io.github.vaiton.agamennone.submit.submitter
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.model.FlagStatus
 import io.github.vaiton.agamennone.submit.SubmissionProtocol
+import io.github.vaiton.agamennone.submit.SubmissionProtocol.SubmissionResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -24,7 +25,7 @@ class EnoWars : SubmissionProtocol {
     override suspend fun submitFlags(
         flags: List<String>,
         config: Config,
-    ): Flow<SubmissionProtocol.SubmissionResult> = flow {
+    ): Flow<SubmissionResult> = flow {
         val submissionPort = checkNotNull(config.submissionPort) {
             "No submission port specified in config file."
         }
@@ -75,7 +76,7 @@ class EnoWars : SubmissionProtocol {
         writer: OutputStreamWriter,
         reader: BufferedReader,
         flag: String,
-    ): SubmissionProtocol.SubmissionResult {
+    ): SubmissionResult {
         // To submit a flag, the client MUST send the flag followed by a single newline.
         writer.write(flag + "\n")
         writer.flush()
@@ -103,7 +104,7 @@ class EnoWars : SubmissionProtocol {
 
         val message = parts.getOrNull(2)?.trim()
 
-        return SubmissionProtocol.SubmissionResult(flag, status, "$responseCode $message")
+        return SubmissionResult(flag, status, "$responseCode $message")
     }
 
     private fun readWelcomeBanner(reader: BufferedReader): String {

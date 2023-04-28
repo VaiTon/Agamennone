@@ -3,10 +3,10 @@ package io.github.vaiton.agamennone.submit
 import io.github.vaiton.agamennone.AgamennoneMetrics
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.ConfigManager
-import io.github.vaiton.agamennone.storage.FlagDatabase
 import io.github.vaiton.agamennone.storage.Flag
-import io.github.vaiton.agamennone.model.FlagStatus
+import io.github.vaiton.agamennone.storage.FlagDatabase
 import io.github.vaiton.agamennone.storage.Flags
+import io.github.vaiton.agamennone.submit.SubmissionProtocol.SubmissionResult
 import kotlinx.coroutines.delay
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -60,7 +60,6 @@ object Submitter {
     }
 
     private suspend fun skipOldFlags(submitStartTime: LocalDateTime, config: Config) {
-        log.debug { "Skipping old flags..." }
         // calculate the time before which flags should be skipped
         val skipTime = submitStartTime - config.flagLifetime.seconds.toJavaDuration()
 
@@ -80,22 +79,22 @@ object Submitter {
 
         kotlin.runCatching {
             protocol.submitFlags(submissions, config)
-                .collect { (flag, status) -> setFlagStatus(flag, status, cycle) }
+                .collect { setFlagStatus(it, cycle) }
         }.getOrElse {
             log.error(it) { "Error while submitting flags." }
         }
     }
 
     private suspend fun setFlagStatus(
-        flag: String,
-        status: FlagStatus,
+        result: SubmissionResult,
         cycle: Int,
     ) = newSuspendedTransaction {
-        Flags.update({ Flags.flag eq flag }) { it ->
-            it[Flags.status] = status
+        Flags.update({ Flags.flag eq result.flag }) { it ->
+            it[status] = result.status
+            it[checkSystemResponse] = result.checkSystemResponse
             it[sentCycle] = cycle
         }
-        log.debug { "Submitted flag '${flag}' with status $status" }
+        log.debug { "Submitted flag '${result.flag}' with status ${result.status}" }
     }
 
 }

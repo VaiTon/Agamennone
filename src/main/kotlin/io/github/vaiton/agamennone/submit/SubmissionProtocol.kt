@@ -15,7 +15,7 @@ interface SubmissionProtocol {
     data class SubmissionResult(
         val flag: String,
         val status: FlagStatus,
-        val message: String,
+        val checkSystemResponse: String,
     )
 
     /**
