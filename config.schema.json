@@ -19,8 +19,14 @@
       "type": "string",
       "enum": [
         "ENOWARS",
-        "EXTERNAL"
+        "EXTERNAL",
+        "CYBERCHALLENGEIT"
       ]
+    },
+    "submissionUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL of the submission service"
     },
     "submissionHost": {
       "type": "string",
@@ -35,6 +41,10 @@
     "submissionSendsWelcomeBanner": {
       "type": "boolean",
       "description": "Whether the submission service sends a welcome banner"
+    },
+    "submissionToken": {
+      "type": "string",
+      "description": "The token that the submission service must send to authenticate"
     },
     "submissionPeriod": {
       "type": "integer",

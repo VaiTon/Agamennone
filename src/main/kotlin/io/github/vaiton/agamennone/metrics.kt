@@ -1,7 +1,7 @@
 package io.github.vaiton.agamennone
 
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
+import io.github.vaiton.agamennone.storage.Flags
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*

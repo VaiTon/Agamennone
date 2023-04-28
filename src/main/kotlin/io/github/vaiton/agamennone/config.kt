@@ -25,12 +25,13 @@ data class Config(
     val flagRegex: String,
 
     val submissionProtocol: String,
-    val submissionHost: String,
-    val submissionPort: Int,
+    val submissionHost: String? = null,
+    val submissionPort: Int? = null,
+    val submissionUrl: String? = null,
     val submissionSendsWelcomeBanner: Boolean = true,
     val submissionPeriod: Int = 30,
     val submissionFlagLimit: Int = 100,
-    val submissionPath: String? = null,
+    val submissionToken: String? = null,
     val submissionExePath: String? = null,
 
     val flagInfoUrl: String? = null,

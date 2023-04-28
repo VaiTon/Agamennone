@@ -1,6 +1,7 @@
 package io.github.vaiton.agamennone
 
 import io.github.vaiton.agamennone.api.apiModule
+import io.github.vaiton.agamennone.storage.FlagDatabase
 import io.github.vaiton.agamennone.submit.Submitter
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

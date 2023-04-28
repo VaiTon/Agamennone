@@ -1,9 +1,9 @@
 package io.github.vaiton.agamennone.api
 
 import io.github.vaiton.agamennone.compatibility.DestructiveFarm
-import io.github.vaiton.agamennone.model.Flag
+import io.github.vaiton.agamennone.storage.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
+import io.github.vaiton.agamennone.storage.Flags
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -70,11 +70,11 @@ private fun Route.getFlags() = get {
             .apply { if (limit != null) limit(limit) }
             .map(::FlagsResponse)
     }
-    call.respond(flags)
+    return@get call.respond(flags)
 }
 
 private fun Route.postFlags() = post {
-    DestructiveFarm.clientFlags(this)
-    call.respond(HttpStatusCode.Created)
+    DestructiveFarm.recieveFlags(this)
+    return@post call.respond(HttpStatusCode.Created)
 }
 

@@ -1,12 +1,12 @@
 package io.github.vaiton.agamennone.api
 
 import io.github.vaiton.agamennone.ConfigManager
-import io.github.vaiton.agamennone.FlagDatabase
+import io.github.vaiton.agamennone.storage.FlagDatabase
 import io.github.vaiton.agamennone.GameServerInfoUpdater
 import io.github.vaiton.agamennone.compatibility.DestructiveFarm
-import io.github.vaiton.agamennone.model.Flag
+import io.github.vaiton.agamennone.storage.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
+import io.github.vaiton.agamennone.storage.Flags
 import io.github.vaiton.agamennone.prometheus
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*

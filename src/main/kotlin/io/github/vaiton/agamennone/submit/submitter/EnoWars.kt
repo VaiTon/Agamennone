@@ -1,10 +1,12 @@
-package io.github.vaiton.agamennone.submit.protocols
+package io.github.vaiton.agamennone.submit.submitter
 
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.model.FlagStatus
 import io.github.vaiton.agamennone.submit.SubmissionProtocol
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import mu.KotlinLogging
 import java.io.BufferedReader
 import java.io.IOException
@@ -14,7 +16,7 @@ import java.net.Socket
 /**
  * [Protocol](https://ctf-gameserver.org/submission/)
  */
-object EnoWars : SubmissionProtocol {
+class EnoWars : SubmissionProtocol {
     private val log = KotlinLogging.logger {}
     private val WHITESPACE = Regex("[\\s\\t]")
     private val NEWLINE = Char(0x0A)
@@ -22,20 +24,21 @@ object EnoWars : SubmissionProtocol {
     override suspend fun submitFlags(
         flags: List<String>,
         config: Config,
-    ): List<SubmissionProtocol.SubmissionResult> = withContext(Dispatchers.IO) {
+    ): Flow<SubmissionProtocol.SubmissionResult> = flow {
+        val submissionPort = checkNotNull(config.submissionPort) {
+            "No submission port specified in config file."
+        }
+
         // The client connects to the server on a TCP port specified by
         // the respective CTF.
         log.debug {
             buildString {
-                append("Connecting to ${config.submissionHost}:${config.submissionPort}")
+                append("Connecting to ${config.submissionHost}:$submissionPort")
                 append(" with ${flags.size} flags")
-                if (config.submissionPath != null) {
-                    append(" and path ${config.submissionPath}")
-                }
             }
         }
         // create the socket and auto-close it after use
-        Socket(config.submissionHost, config.submissionPort).use { socket ->
+        Socket(config.submissionHost, submissionPort).use { socket ->
 
             val writer = socket.getOutputStream().writer()
             val reader = socket.getInputStream().bufferedReader()
@@ -45,7 +48,7 @@ object EnoWars : SubmissionProtocol {
             // > The server MUST indicate that the welcome sequence has finished by sending
             // > two subsequent newlines (\n\n).
             if (config.submissionSendsWelcomeBanner) {
-                log.debug { "Reading welcome message.." }
+                log.trace { "Reading welcome message.." }
                 val welcomeMessage = kotlin.runCatching {
                     readWelcomeBanner(reader)
                 }.getOrElse { e ->
@@ -57,16 +60,16 @@ object EnoWars : SubmissionProtocol {
                     )
 
                 }
-                log.debug { welcomeMessage }
-                log.debug { "Welcome message read." }
+                log.trace { welcomeMessage }
+                log.trace { "Welcome message read." }
             }
 
             // Send flags and read responses
-            return@withContext flags.map {
-                sendFlag(writer, reader, it)
+            for (flag in flags) {
+                emit(sendFlag(writer, reader, flag))
             }
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     private fun sendFlag(
         writer: OutputStreamWriter,
@@ -76,7 +79,7 @@ object EnoWars : SubmissionProtocol {
         // To submit a flag, the client MUST send the flag followed by a single newline.
         writer.write(flag + "\n")
         writer.flush()
-        log.debug { "Sent flag '${flag}'" }
+        log.trace { "Sent flag '${flag}'" }
 
         // The server's response MUST consist of:
         //
@@ -87,7 +90,7 @@ object EnoWars : SubmissionProtocol {
         // - Newline
 
         val line = reader.readLine() ?: throw IOException("Server closed connection")
-        log.debug { "Received response '$line'" }
+        log.trace { "Received response '$line'" }
 
         val parts = line.split(WHITESPACE)
         val responseCode = parts[1].trim()

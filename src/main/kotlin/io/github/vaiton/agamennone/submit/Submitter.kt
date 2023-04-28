@@ -3,10 +3,10 @@ package io.github.vaiton.agamennone.submit
 import io.github.vaiton.agamennone.AgamennoneMetrics
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.ConfigManager
-import io.github.vaiton.agamennone.FlagDatabase
-import io.github.vaiton.agamennone.model.Flag
+import io.github.vaiton.agamennone.storage.FlagDatabase
+import io.github.vaiton.agamennone.storage.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
+import io.github.vaiton.agamennone.storage.Flags
 import kotlinx.coroutines.delay
 import mu.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -74,54 +74,28 @@ object Submitter {
 
     private suspend fun submitFlags(flags: List<Flag>, config: Config, cycle: Int) {
         val submitterProtocol = config.submissionProtocol
-        val protocol = SubmissionProtocol.getProtocol(submitterProtocol)
+        val protocol = SubmissionProtocol.createProtocol(submitterProtocol)
 
         val submissions = flags.map { it.flag }
 
-        val results = kotlin.runCatching {
-            newSuspendedTransaction {
-                protocol.submitFlags(submissions, config)
-            }
+        kotlin.runCatching {
+            protocol.submitFlags(submissions, config)
+                .collect { (flag, status) -> setFlagStatus(flag, status, cycle) }
         }.getOrElse {
             log.error(it) { "Error while submitting flags." }
-            emptyList()
         }
+    }
 
-
-
-        newSuspendedTransaction {
-            results.forEach { flag ->
-                Flags.update({ Flags.flag eq flag.flag }) {
-                    it[status] = flag.status
-                    it[sentCycle] = cycle
-                }
-                log.debug { "Submitted flag '${flag.flag}' with status ${flag.status}" }
-            }
+    private suspend fun setFlagStatus(
+        flag: String,
+        status: FlagStatus,
+        cycle: Int,
+    ) = newSuspendedTransaction {
+        Flags.update({ Flags.flag eq flag }) { it ->
+            it[Flags.status] = status
+            it[sentCycle] = cycle
         }
-
-        log.info {
-            // We calculate the number in the log block so that we don't have to
-            // do it if the log level is not info
-
-            val acceptedCount = flags.count { it.status == FlagStatus.ACCEPTED }
-            val rejectedCount = flags.count { it.status == FlagStatus.REJECTED }
-            val skippedCount = flags.count { it.status == FlagStatus.SKIPPED }
-
-            buildString {
-                append("Submitted ")
-                append(flags.size)
-                append(" flags: ")
-                if (acceptedCount > 0) {
-                    append("accepted=$acceptedCount,")
-                }
-                if (rejectedCount > 0) {
-                    append("|rejected=$rejectedCount,")
-                }
-                if (skippedCount > 0) {
-                    append("|skipped=$skippedCount")
-                }
-            }
-        }
+        log.debug { "Submitted flag '${flag}' with status $status" }
     }
 
 }

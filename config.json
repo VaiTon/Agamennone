@@ -5,6 +5,7 @@
   "submissionProtocol": "ENOWARS",
   "submissionHost": "127.0.0.1",
   "submissionPort": 663,
+  "submissionPeriod": 10,
   "serverHost": "0.0.0.0",
   "serverPort": 8081
 }

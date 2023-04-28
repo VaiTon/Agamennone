@@ -1,5 +1,6 @@
-package io.github.vaiton.agamennone.model
+package io.github.vaiton.agamennone.storage
 
+import io.github.vaiton.agamennone.model.FlagStatus
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -15,7 +16,6 @@ object Flags : IntIdTable() {
     val checkSystemResponse = varchar("check_system_response", 255).nullable()
     val sentCycle = integer("sent_cycle").nullable()
 }
-
 
 class Flag(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<Flag>(Flags)

@@ -1,8 +1,6 @@
-package io.github.vaiton.agamennone
+package io.github.vaiton.agamennone.storage
 
-import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction

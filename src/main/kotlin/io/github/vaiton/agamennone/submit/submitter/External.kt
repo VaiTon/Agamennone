@@ -1,9 +1,12 @@
-package io.github.vaiton.agamennone.submit.protocols
+package io.github.vaiton.agamennone.submit.submitter
 
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.submit.SubmissionProtocol
+import io.github.vaiton.agamennone.submit.SubmissionProtocol.SubmissionResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -12,13 +15,13 @@ import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
 import kotlin.io.path.isExecutable
 
-object External : SubmissionProtocol {
+class External : SubmissionProtocol {
 
     @OptIn(ExperimentalSerializationApi::class)
     override suspend fun submitFlags(
         flags: List<String>,
         config: Config,
-    ): List<SubmissionProtocol.SubmissionResult> = withContext(Dispatchers.IO) {
+    ): Flow<SubmissionResult> = flow {
 
         // check if path is provided and executable
         val pathConfig = config.submissionExePath
@@ -42,12 +45,14 @@ object External : SubmissionProtocol {
 
         // wait for the process to finish
         val statusCode = process.waitFor()
+
         check(statusCode == 0) {
             "Submitter exited with status code $statusCode"
         }
 
 
         // read flags from stdout
-        Json.decodeFromStream(process.inputStream)
-    }
+        val results: List<SubmissionResult> = Json.decodeFromStream(process.inputStream)
+        results.forEach { emit(it) }
+    }.flowOn(Dispatchers.IO)
 }

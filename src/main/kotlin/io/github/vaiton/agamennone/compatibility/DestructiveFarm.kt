@@ -3,10 +3,9 @@ package io.github.vaiton.agamennone.compatibility
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.ConfigManager
 import io.github.vaiton.agamennone.model.FlagStatus
-import io.github.vaiton.agamennone.model.Flags
+import io.github.vaiton.agamennone.storage.Flags
 import io.github.vaiton.agamennone.model.Team
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
@@ -46,7 +45,7 @@ internal object DestructiveFarm {
         fun isValid(regex: Regex) = flag.isNotBlank() && flag.matches(regex)
     }
 
-    suspend fun clientFlags(context: PipelineContext<Unit, ApplicationCall>) {
+    suspend fun recieveFlags(context: PipelineContext<Unit, ApplicationCall>) {
         val receivedTime = LocalDateTime.now()
 
         val config = ConfigManager.config.value
@@ -55,12 +54,6 @@ internal object DestructiveFarm {
         val partialFlags = context.call.receive<List<PartialFlag>>()
             .filter { it.isValid(flagRegex) } // Only accept valid flags
 
-
-        logger.info {
-            val remoteHost = context.call.request.origin.remoteHost
-            val size = partialFlags.size
-            "Received $size flags from DestructiveFarm client at $remoteHost"
-        }
 
         // Insert flags into database
         newSuspendedTransaction {
@@ -71,6 +64,11 @@ internal object DestructiveFarm {
                 this[Flags.receivedTime] = receivedTime
                 this[Flags.status] = FlagStatus.QUEUED
             }
+        }
+
+        logger.info {
+            val size = partialFlags.size
+            "Received $size flags from DestructiveFarm client"
         }
     }
 }
