@@ -17,11 +17,6 @@ object FlagDatabase {
         TransactionManager.manager.defaultIsolationLevel =
             Connection.TRANSACTION_SERIALIZABLE
 
-        // print sql to std-out
-        transaction {
-            addLogger(StdOutSqlLogger)
-        }
-
         transaction {
             SchemaUtils.create(Flags)
         }
@@ -33,11 +28,11 @@ object FlagDatabase {
      */
     suspend fun getMaxCycle(): Int? {
         return newSuspendedTransaction {
-            Flag.all()
-                .limit(1)
-                .sortedByDescending { it.sentCycle }
+            val result = Flags.slice(Flags.sentCycle.max())
+                .selectAll()
                 .firstOrNull()
-                ?.sentCycle
+
+            result?.getOrNull<Int?>(Flags.sentCycle.max())
         }
     }
 

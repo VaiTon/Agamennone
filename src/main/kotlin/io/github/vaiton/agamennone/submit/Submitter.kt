@@ -1,13 +1,16 @@
 package io.github.vaiton.agamennone.submit
 
+import io.github.vaiton.agamennone.AgamennoneMetrics
 import io.github.vaiton.agamennone.Config
 import io.github.vaiton.agamennone.ConfigManager
 import io.github.vaiton.agamennone.FlagDatabase
-import io.github.vaiton.agamennone.Metrics
 import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
+import io.github.vaiton.agamennone.model.Flags
 import kotlinx.coroutines.delay
 import mu.KotlinLogging
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.update
 import java.time.Duration
 import java.time.LocalDateTime
 import kotlin.time.Duration.Companion.seconds
@@ -29,20 +32,19 @@ object Submitter {
             skipOldFlags(submitStartTime, config)
 
             val queuedFlags = FlagDatabase.getQueuedFlags()
-            Metrics.setQueuedFlags(queuedFlags.size)
 
             val toSubmit = queuedFlags.take(config.submissionFlagLimit)
 
             if (queuedFlags.isNotEmpty()) {
                 log.info { "Submitting ${toSubmit.size} flags (out of ${queuedFlags.size} queued)." }
-                submitFlags(toSubmit, config)
+                submitFlags(toSubmit, config, cycle)
             }
 
             val submitEndTime = LocalDateTime.now()
             val loopTime = Duration.between(submitStartTime, submitEndTime).toKotlinDuration()
 
             // Update submitter latency
-            Metrics.observeSubmitterLatency(loopTime)
+            AgamennoneMetrics.observeSubmitterLatency(loopTime)
 
             val submitPeriodInSeconds = config.submissionPeriod.seconds
 
@@ -66,35 +68,48 @@ object Submitter {
         val skipped = FlagDatabase.skipOldFlags(skipTime)
 
         // if any flags were skipped, log it and update the metrics
-        Metrics.incrementTimedOutFlags(skipped)
         log.info { "Skipped $skipped old flags." }
     }
 
-    private suspend fun submitFlags(flags: List<Flag>, config: Config) {
+
+    private suspend fun submitFlags(flags: List<Flag>, config: Config, cycle: Int) {
         val submitterProtocol = config.submissionProtocol
         val protocol = SubmissionProtocol.getProtocol(submitterProtocol)
 
-        val submittedFlags = kotlin.runCatching { protocol.submitFlags(flags, config) }
-            .onFailure { log.error(it) { "Error while submitting flags." } }
-            .getOrDefault(emptyList())
+        val submissions = flags.map { it.flag }
 
-        submittedFlags.forEach { flag ->
-            FlagDatabase.setFlagResponse(flag)
-            Metrics.incrementFlagStatus(flag.status, flag.sploit, flag.team)
-            log.debug { "Submitted flag '${flag.flag}' with status ${flag.status}" }
+        val results = kotlin.runCatching {
+            newSuspendedTransaction {
+                protocol.submitFlags(submissions, config)
+            }
+        }.getOrElse {
+            log.error(it) { "Error while submitting flags." }
+            emptyList()
+        }
+
+
+
+        newSuspendedTransaction {
+            results.forEach { flag ->
+                Flags.update({ Flags.flag eq flag.flag }) {
+                    it[status] = flag.status
+                    it[sentCycle] = cycle
+                }
+                log.debug { "Submitted flag '${flag.flag}' with status ${flag.status}" }
+            }
         }
 
         log.info {
             // We calculate the number in the log block so that we don't have to
             // do it if the log level is not info
 
-            val acceptedCount = submittedFlags.count { it.status == FlagStatus.ACCEPTED }
-            val rejectedCount = submittedFlags.count { it.status == FlagStatus.REJECTED }
-            val skippedCount = submittedFlags.count { it.status == FlagStatus.SKIPPED }
+            val acceptedCount = flags.count { it.status == FlagStatus.ACCEPTED }
+            val rejectedCount = flags.count { it.status == FlagStatus.REJECTED }
+            val skippedCount = flags.count { it.status == FlagStatus.SKIPPED }
 
             buildString {
                 append("Submitted ")
-                append(submittedFlags.size)
+                append(flags.size)
                 append(" flags: ")
                 if (acceptedCount > 0) {
                     append("accepted=$acceptedCount,")

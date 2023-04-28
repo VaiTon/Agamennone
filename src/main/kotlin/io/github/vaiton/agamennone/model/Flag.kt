@@ -27,8 +27,5 @@ class Flag(id: EntityID<Int>) : IntEntity(id) {
     var status by Flags.status
     var checkSystemResponse by Flags.checkSystemResponse
     var sentCycle by Flags.sentCycle
-
-
-    fun isValid(regex: Regex) = flag.isNotBlank() && flag.matches(regex)
 }
 

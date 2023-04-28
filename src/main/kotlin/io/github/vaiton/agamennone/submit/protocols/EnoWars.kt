@@ -1,7 +1,6 @@
 package io.github.vaiton.agamennone.submit.protocols
 
 import io.github.vaiton.agamennone.Config
-import io.github.vaiton.agamennone.model.Flag
 import io.github.vaiton.agamennone.model.FlagStatus
 import io.github.vaiton.agamennone.submit.SubmissionProtocol
 import kotlinx.coroutines.Dispatchers
@@ -21,9 +20,9 @@ object EnoWars : SubmissionProtocol {
     private val NEWLINE = Char(0x0A)
 
     override suspend fun submitFlags(
-        flags: List<Flag>,
+        flags: List<String>,
         config: Config,
-    ) = withContext(Dispatchers.IO) {
+    ): List<SubmissionProtocol.SubmissionResult> = withContext(Dispatchers.IO) {
         // The client connects to the server on a TCP port specified by
         // the respective CTF.
         log.debug {
@@ -35,58 +34,49 @@ object EnoWars : SubmissionProtocol {
                 }
             }
         }
-        val socket = Socket(
-            /* host = */ config.submissionHost,
-            /* port = */ config.submissionPort,
-        )
-        val writer = socket.getOutputStream().writer()
-        val reader = socket.getInputStream().bufferedReader()
+        // create the socket and auto-close it after use
+        Socket(config.submissionHost, config.submissionPort).use { socket ->
 
-        // The server MAY send a welcome banner, consisting of anything except
-        // two subsequent newlines.
-        // The server MUST indicate that the welcome sequence has finished by sending
-        // two subsequent newlines (\n\n).
-        if (config.submissionSendsWelcomeBanner) {
-            log.debug { "Reading welcome message.." }
-            val welcomeMessage = kotlin.runCatching {
-                readWelcomeBanner(reader)
-            }.getOrElse { e ->
-                log.error(e) {
-                    "Failed to read welcome message. " +
-                            "If this server does not send a welcome message please disable it in the config file."
+            val writer = socket.getOutputStream().writer()
+            val reader = socket.getInputStream().bufferedReader()
+
+            // > The server MAY send a welcome banner, consisting of anything except
+            // > two subsequent newlines.
+            // > The server MUST indicate that the welcome sequence has finished by sending
+            // > two subsequent newlines (\n\n).
+            if (config.submissionSendsWelcomeBanner) {
+                log.debug { "Reading welcome message.." }
+                val welcomeMessage = kotlin.runCatching {
+                    readWelcomeBanner(reader)
+                }.getOrElse { e ->
+                    throw IOException(
+                        "Failed to read welcome message. " +
+                                "If this server does not send a welcome message please disable it " +
+                                "in the config file.",
+                        e
+                    )
+
                 }
-                return@withContext emptyList()
+                log.debug { welcomeMessage }
+                log.debug { "Welcome message read." }
             }
-            log.debug { welcomeMessage }
-            log.debug { "Welcome message read." }
-        }
 
-        // Send flags and read responses
-        val result = flags.map { flag ->
-            val (status, response) = sendFlag(writer, reader, flag)
-            flag.status = status
-            flag.checkSystemResponse = response
-            flag
+            // Send flags and read responses
+            return@withContext flags.map {
+                sendFlag(writer, reader, it)
+            }
         }
-
-        socket.close()
-        result
     }
-
-    data class CheckServerResponse(
-        val status: FlagStatus,
-        val message: String,
-    )
 
     private fun sendFlag(
         writer: OutputStreamWriter,
         reader: BufferedReader,
-        flag: Flag,
-    ): CheckServerResponse {
+        flag: String,
+    ): SubmissionProtocol.SubmissionResult {
         // To submit a flag, the client MUST send the flag followed by a single newline.
-        writer.write(flag.flag + "\n")
+        writer.write(flag + "\n")
         writer.flush()
-        log.debug { "Sent flag '${flag.flag}'" }
+        log.debug { "Sent flag '${flag}'" }
 
         // The server's response MUST consist of:
         //
@@ -110,7 +100,7 @@ object EnoWars : SubmissionProtocol {
 
         val message = parts.getOrNull(2)?.trim()
 
-        return CheckServerResponse(status, "$responseCode $message")
+        return SubmissionProtocol.SubmissionResult(flag, status, "$responseCode $message")
     }
 
     private fun readWelcomeBanner(reader: BufferedReader): String {

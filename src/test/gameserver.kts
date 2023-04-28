@@ -27,7 +27,10 @@ while (true) {
                 2 -> "INV invalido proprio"
                 else -> error("This should not happen")
             }
-            output.write("$line $status\n")
+
+            val message = "$line $status\n"
+            println("Sending: $message")
+            output.write(message)
             output.flush()
         }
     }
