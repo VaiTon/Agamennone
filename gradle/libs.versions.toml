@@ -1,5 +1,5 @@
 [versions]
-ktor_version = "2.3.0"
+ktor_version = "2.3.2"
 kotlin_version = "1.9.0"
 logback_version = "1.4.7"
 prometheus_simpleclient_version = "0.16.0"
