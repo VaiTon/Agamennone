@@ -2,10 +2,24 @@
   "$schema": "config.schema.json",
   "gameName": "My Game",
   "flagRegex": "[a-zA-Z0-9]{31}=",
-  "submissionProtocol": "ENOWARS",
-  "submissionHost": "127.0.0.1",
-  "submissionPort": 663,
+  "submitterPath": "./submit.py",
   "submissionPeriod": 10,
   "serverHost": "0.0.0.0",
-  "serverPort": 8081
+  "serverPort": 8081,
+  "teams": {
+    "team1": "10.0.0.1",
+    "team2": "10.0.0.2",
+    "team3": "10.0.0.3",
+    "team4": "10.0.0.4",
+    "team5": "10.0.0.5",
+    "team6": "10.0.0.6",
+    "team7": "10.0.0.7",
+    "team8": "10.0.0.8",
+    "team9": "10.0.0.9",
+    "team10": "10.0.0.10",
+    "team11": "10.0.0.11",
+    "team12": "10.0.0.12",
+    "team13": "10.0.0.13",
+    "team14": "10.0.0.14"
+  }
 }
