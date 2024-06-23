@@ -2,16 +2,17 @@ package submitter
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
+
 	"github.com/VaiTon/Agamennone/pkg/flag"
+	"github.com/VaiTon/Agamennone/pkg/storage"
 )
 
 const (
@@ -20,26 +21,27 @@ const (
 	ResultSkipped = "SKIPPED"
 )
 
-type SubmitterResult struct {
+type Result struct {
 	Flag    string
 	Result  string
 	Message string
 }
 
 type Submitter struct {
-	db   *sql.DB
-	path string
+	storage storage.FlagStorage
+	path    string
 
 	submitPeriod int
 }
 
 // NewSubmitter creates a new Submitter instance.
-func NewSubmitter(path string, submitPeriod int, db *sql.DB) *Submitter {
-	return &Submitter{db, path, submitPeriod}
+func NewSubmitter(path string, submitPeriod int, storage storage.FlagStorage) *Submitter {
+	return &Submitter{storage: storage, path: path, submitPeriod: submitPeriod}
 }
 
 // Submit sends a flag to the Agamennone server.
-func (s *Submitter) Submit(flags []string) ([]SubmitterResult, error) {
+func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
+
 	// check if the path exists and is a file
 	if _, err := os.Stat(s.path); os.IsNotExist(err) {
 		return nil, fmt.Errorf("file %s does not exist", s.path)
@@ -52,9 +54,15 @@ func (s *Submitter) Submit(flags []string) ([]SubmitterResult, error) {
 		}
 	}
 
+	// map flags to a string slice
+	flagsTxts := make([]string, 0, len(flags))
+	for _, f := range flags {
+		flagsTxts = append(flagsTxts, f.Flag)
+	}
+
 	// execute the file, passing flags via stdin, \n is used as a delimiter
 	cmd := exec.Command(s.path)
-	cmd.Stdin = strings.NewReader(strings.Join(flags, "\n"))
+	cmd.Stdin = strings.NewReader(strings.Join(flagsTxts, "\n"))
 
 	// capture and parse the output
 	output, err := cmd.Output()
@@ -63,7 +71,7 @@ func (s *Submitter) Submit(flags []string) ([]SubmitterResult, error) {
 	}
 
 	// check the result: for each line in the output, check if it's OK, ERROR or SKIPPED
-	results := make([]SubmitterResult, 0, len(flags))
+	results := make([]Result, 0, len(flags))
 
 	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -77,9 +85,9 @@ func (s *Submitter) Submit(flags []string) ([]SubmitterResult, error) {
 			return nil, fmt.Errorf("submitter returned an invalid line: %s", line)
 		}
 
-		flag := parts[0]
-		if !slices.Contains(flags, flag) {
-			return nil, fmt.Errorf("submitter returned an unknown flag: %s", flag)
+		f := parts[0]
+		if !slices.Contains(flagsTxts, f) {
+			return nil, fmt.Errorf("submitter returned an unknown flag: %s", f)
 		}
 
 		result := parts[1]
@@ -94,75 +102,76 @@ func (s *Submitter) Submit(flags []string) ([]SubmitterResult, error) {
 		}
 
 		message := strings.Join(parts[2:], " ")
-		results = append(results, SubmitterResult{Flag: flag, Result: result, Message: message})
+		results = append(results, Result{Flag: f, Result: result, Message: message})
 	}
 
 	return results, nil
 }
 
 func (s *Submitter) SubmitLoop(ctx context.Context) error {
-	log.Print("Starting submit loop")
+	logger := log.WithPrefix("submitter")
+
+	logger.Info("Starting submit loop")
 
 	for {
 
-		// Get all flags from the database that are in the "queued" state
-		rows, err := s.db.Query("SELECT flag FROM flags WHERE status = ?", flag.FlagStatusQueued)
-		if err != nil {
-			return fmt.Errorf("error querying flags from database: %v", err)
-		}
+		startTime := time.Now()
 
-		// Parse the flags
-		flags := make([]string, 0)
-		for rows.Next() {
-			var flag string
-			err = rows.Scan(&flag)
-			if err != nil {
-				return fmt.Errorf("error scanning flags from database: %v", err)
-			}
-			flags = append(flags, flag)
+		// Get all flags from the database that are in the "queued" state
+		flags, err := s.storage.GetByStatus(flag.StatusQueued, 0)
+		if err != nil {
+			return fmt.Errorf("error getting flags from database: %v", err)
 		}
 
 		// If there are no flags, sleep for a while and try again
 		if len(flags) == 0 {
-			log.Printf("No flags to submit. Sleeping for %d seconds", s.submitPeriod)
+			logger.Debugf("no flags to submit")
 		} else {
 
 			// try to submit the flags
+			submitTime := time.Now()
+			logger.Debug("starting external script", "submitter", s.path)
 			results, err := s.Submit(flags)
 			if err != nil {
 				return fmt.Errorf("error submitting flags: %v", err)
 			}
+			submitElapsedTime := time.Since(submitTime)
+			logger.Debugf("script exited in %.2fs", submitElapsedTime.Seconds())
 
 			// map result to status
-			statuses := make([]int, len(results))
+			statuses := make([]string, len(results))
 			for i, result := range results {
 				switch result.Result {
 				case ResultOk:
-					statuses[i] = flag.FlagStatusAccepted
+					statuses[i] = flag.StatusAccepted
 				case ResultError:
-					statuses[i] = flag.FlagStatusRejected
+					statuses[i] = flag.StatusRejected
 				case ResultSkipped:
-					statuses[i] = flag.FlagStatusSkipped
+					statuses[i] = flag.StatusSkipped
 				default:
-					log.Printf("Invalid result: %s", result.Result)
-					statuses[i] = flag.FlagStatusQueued
+					logger.Printf("Invalid result: %s", result.Result)
+					statuses[i] = flag.StatusQueued
 				}
 			}
 
 			// Update the status of the flags in the database
-			for i, result := range results {
-				_, err = s.db.Exec("UPDATE flags SET status = ? WHERE flag = ?", result.Result, flags[i])
+			for i := range results {
+				err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitTime)
 				if err != nil {
 					return fmt.Errorf("error updating flag status in database: %v", err)
 				}
 			}
 
-			log.Printf("Submitted %d flags. Sleeping for %d seconds", len(flags), s.submitPeriod)
+			logger.Info("submitted flags", "flags", len(flags))
 		}
 
+		elapsedTime := time.Since(startTime)
+		sleepTime := time.Duration(s.submitPeriod)*time.Second - elapsedTime
+
+		logger.Debugf("sleeping for %.2fs", sleepTime.Seconds())
 		// Sleep for the submission period
 		select {
-		case <-time.After(time.Duration(s.submitPeriod) * time.Second):
+		case <-time.After(sleepTime):
 		case <-ctx.Done():
 			return nil
 		}
