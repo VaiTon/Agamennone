@@ -22,52 +22,6 @@ func setupRouter(e *echo.Echo) {
 	apiR.POST("/flags", postFlags)
 	apiR.GET("/flags", getFlags)
 	apiR.GET("/stats", getStats)
-	apiR.GET("/stats/exploits", getStatsByExploit)
-
-}
-
-func getStatsByExploit(c echo.Context) error {
-	stats, err := storage.GetStatsByExploit()
-	if err != nil {
-		log.Error("error getting statistics by exploit from database", "err", err)
-		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
-	}
-
-	/*
-		{
-			"exploit1": {
-				"rejected": {
-					"10:00": 10,
-					"11:00": 20
-				},
-				"accepted": {
-					...
-				},
-				...
-			},
-			...
-		}
-	*/
-	type exploitStat struct {
-		Hour  time.Time `json:"hour"`
-		Count int       `json:"count"`
-	}
-	type exploitsStats map[string]map[string][]exploitStat
-
-	apiStats := make(exploitsStats)
-	for _, s := range stats {
-		if _, ok := apiStats[s.Exploit]; !ok {
-			apiStats[s.Exploit] = make(map[string][]exploitStat)
-		}
-
-		apiStats[s.Exploit][s.Status] = append(
-			apiStats[s.Exploit][s.Status],
-
-			exploitStat{Hour: s.Hour.In(time.Local), Count: s.Count},
-		)
-	}
-
-	return c.JSON(http.StatusOK, apiStats)
 }
 
 func getConfig(c echo.Context) error {
@@ -144,6 +98,10 @@ func postFlags(c echo.Context) error {
 	}
 
 	insertedFlags, err := storage.InsertFlags(validFlags)
+	if err != nil {
+		log.Error("error inserting flags into database", "err", err)
+		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+	}
 
 	log.Info("received flags",
 		"unique_flags", insertedFlags,

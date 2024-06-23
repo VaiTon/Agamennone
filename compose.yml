@@ -1,0 +1,26 @@
+services:
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: agamennone
+      MYSQL_DATABASE: agamennone
+      MYSQL_USER: agamennone
+      MYSQL_PASSWORD: agamennone
+    ports:
+      - "${EXPOSE_HOST}:3306:3306"
+    restart: on-failure
+
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - db
+    ports:
+      - "${EXPOSE_HOST}:3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+    volumes:
+      - ./grafana:/etc/grafana/provisioning/
+    restart: on-failure
+

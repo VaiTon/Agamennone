@@ -41,6 +41,7 @@ var (
 	configPath   = flag.String("config", "config.json", "path to the configuration file")
 	listenAddr   = flag.String("listen", ":1234", "address to listen on")
 	debug        = flag.Bool("debug", false, "enable debug logging")
+	dbStorage    = flag.String("db", "agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
 )
 
 var storage storage2.FlagStorage
@@ -59,12 +60,9 @@ func main() {
 		log.Fatalf("error loading configuration: %v", err)
 	}
 
-	const dbPath = "flags.db"
-
-	log.Print("opening database", "path", dbPath)
-	storage, err = storage2.NewSqliteStorage(dbPath)
+	storage, err = storage2.NewMariaDBStorage(*dbStorage)
 	if err != nil {
-		log.Fatalf("error opening database: %v", err)
+		log.Fatalf("Error creating storage: %v", err)
 	}
 
 	err = storage.Init()

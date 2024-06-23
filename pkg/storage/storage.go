@@ -13,7 +13,6 @@ type FlagStorage interface {
 	GetStatisticsV1() (StatisticsV1, error)
 	UpdateSentFlag(flag, status, checkSystemResponse string, sentTime time.Time) error
 	InsertFlags(flags []flag.Flag) (int64, error)
-	GetStatsByExploit() ([]StatsByExploit, error)
 }
 
 type StatsByExploit struct {

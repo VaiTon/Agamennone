@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: mariadb
+    type: mysql
+    url: db:3306
+    user: agamennone
+    jsonData:
+      database: agamennone
+    secureJsonData:
+      password: agamennone
+    access: proxy
+    isDefault: true
