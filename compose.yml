@@ -9,6 +9,8 @@ services:
     ports:
       - "${EXPOSE_HOST}:3306:3306"
     restart: on-failure
+    volumes:
+      - ./db:/var/lib/mysql
 
   grafana:
     image: grafana/grafana

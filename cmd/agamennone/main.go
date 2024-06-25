@@ -6,19 +6,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
 
-	storage2 "github.com/VaiTon/Agamennone/pkg/storage"
+	"github.com/VaiTon/Agamennone/pkg/storage"
 	"github.com/VaiTon/Agamennone/pkg/submitter"
-
-	"github.com/charmbracelet/log"
 )
 
 type ClientConfigTeams map[string]string
@@ -41,10 +42,10 @@ var (
 	configPath   = flag.String("config", "config.json", "path to the configuration file")
 	listenAddr   = flag.String("listen", ":1234", "address to listen on")
 	debug        = flag.Bool("debug", false, "enable debug logging")
-	dbStorage    = flag.String("db", "agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
+	dbConnStr    = flag.String("db", "mariadb://agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
 )
 
-var storage storage2.FlagStorage
+var store storage.FlagStorage
 
 func main() {
 	flag.Parse()
@@ -60,18 +61,22 @@ func main() {
 		log.Fatalf("error loading configuration: %v", err)
 	}
 
-	storage, err = storage2.NewMariaDBStorage(*dbStorage)
+	store, err = createStorage(*dbConnStr)
 	if err != nil {
 		log.Fatalf("Error creating storage: %v", err)
 	}
 
-	err = storage.Init()
+	err = store.Init()
 	if err != nil {
-		log.Fatalf("Error initializing database: %v", err)
+		log.Fatalf("error initializing database: %v", err)
 	}
 
+	httpLogger := log.WithPrefix("http")
 	e := echo.New()
-	e.Use(loggingMiddleware)
+	e.HideBanner = true
+	e.Logger.SetOutput(io.Discard)
+	logMiddleware := loggingMiddleware(httpLogger)
+	e.Use(logMiddleware)
 	setupRouter(e)
 
 	// Handle interrupt signal
@@ -80,13 +85,13 @@ func main() {
 
 	// Start server
 	go func() {
-		log.Printf("Starting server on %s", *listenAddr)
+		httpLogger.Info("starting server", "addr", *listenAddr)
 		if err := e.Start(*listenAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			e.Logger.Fatal("shutting down the server")
+			httpLogger.Fatalf("shutting down server: %v", err)
 		}
 	}()
 
-	s := submitter.NewSubmitter(serverConfig.SubmitterPath, serverConfig.SubmissionPeriod, storage)
+	s := submitter.NewSubmitter(serverConfig.SubmitterPath, serverConfig.SubmissionPeriod, store)
 	// Start submit loop
 	go func() {
 		err := s.SubmitLoop(ctx)
@@ -106,6 +111,28 @@ func main() {
 	if err := e.Shutdown(ctx); err != nil {
 		e.Logger.Fatal(err)
 	}
+}
+
+func createStorage(storageConnStr string) (store storage.FlagStorage, err error) {
+	parts := strings.Split(storageConnStr, "://")
+	if len(parts) < 2 {
+		err = fmt.Errorf("invalid database connection string: %s", storageConnStr)
+		return
+	}
+
+	connType := strings.ToLower(parts[0])
+	storageConnStr = strings.Join(parts[1:], ":")
+
+	log.Debug("creating storage", "type", connType)
+	switch connType {
+	case "mysql":
+		store, err = storage.NewMariaDBStorage(storageConnStr)
+	case "sqlite":
+		store, err = storage.NewSQliteStorage(storageConnStr)
+	default:
+		err = fmt.Errorf("unsupported database type: %s", connType)
+	}
+	return
 }
 
 func loadConfig() error {
@@ -136,19 +163,19 @@ func loadConfig() error {
 	return nil
 }
 
-func loggingMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+func loggingMiddleware(logger *log.Logger) func(echo.HandlerFunc) echo.HandlerFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			start := time.Now()
+			err := next(c)
+			timeTaken := time.Since(start)
 
-	l := log.WithPrefix("http")
-	return func(c echo.Context) error {
-		start := time.Now()
-		err := next(c)
-		timeTaken := time.Since(start)
+			logger.Debugf("[%s] %s %s %s %d %s",
+				c.RealIP(), c.Request().Method, c.Path(),
+				c.Request().Proto, c.Response().Status, timeTaken,
+			)
 
-		l.Debugf("[%s] %s %s %s %d %s",
-			c.RealIP(), c.Request().Method, c.Path(),
-			c.Request().Proto, c.Response().Status, timeTaken,
-		)
-
-		return err
+			return err
+		}
 	}
 }

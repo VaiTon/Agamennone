@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 
-	aflag "github.com/VaiTon/Agamennone/pkg/flag"
+	"github.com/VaiTon/Agamennone/pkg/flag"
 )
 
 func setupRouter(e *echo.Echo) {
@@ -43,7 +43,7 @@ func getConfig(c echo.Context) error {
 
 func getStats(c echo.Context) error {
 
-	stats, err := storage.GetStatisticsV1()
+	stats, err := store.GetStatisticsV1()
 	if err != nil {
 		log.Error("error getting statistics from database", "err", err)
 		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
@@ -61,10 +61,10 @@ func getStats(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, serverStats{
 		Flags:         stats.TotalFlags,
-		QueuedFlags:   stats.TotalFlagsByStatus[aflag.StatusQueued],
-		AcceptedFlags: stats.TotalFlagsByStatus[aflag.StatusAccepted],
-		RejectedFlags: stats.TotalFlagsByStatus[aflag.StatusRejected],
-		SkippedFlags:  stats.TotalFlagsByStatus[aflag.StatusSkipped],
+		QueuedFlags:   stats.TotalFlagsByStatus[flag.StatusQueued],
+		AcceptedFlags: stats.TotalFlagsByStatus[flag.StatusAccepted],
+		RejectedFlags: stats.TotalFlagsByStatus[flag.StatusRejected],
+		SkippedFlags:  stats.TotalFlagsByStatus[flag.StatusSkipped],
 	})
 }
 
@@ -74,14 +74,14 @@ func postFlags(c echo.Context) error {
 	body := c.Request().Body
 
 	// Parse JSON
-	var partialFlags []aflag.Flag
+	var partialFlags []flag.Flag
 	err := json.NewDecoder(body).Decode(&partialFlags)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "Invalid JSON")
 	}
 
 	// Filter out invalid flags
-	validFlags := make([]aflag.Flag, 0, len(partialFlags))
+	validFlags := make([]flag.Flag, 0, len(partialFlags))
 	for _, partialFlag := range partialFlags {
 		if serverConfig.FlagRegex.MatchString(partialFlag.Flag) {
 			validFlags = append(validFlags, partialFlag)
@@ -97,7 +97,7 @@ func postFlags(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "No valid flags")
 	}
 
-	insertedFlags, err := storage.InsertFlags(validFlags)
+	insertedFlags, err := store.InsertFlags(validFlags)
 	if err != nil {
 		log.Error("error inserting flags into database", "err", err)
 		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
@@ -127,7 +127,7 @@ func getFlags(c echo.Context) error {
 		}
 	}
 
-	flags, err := storage.GetLastFlags(limit)
+	flags, err := store.GetLastFlags(limit)
 	if err != nil {
 		log.Error("error getting flags from database", "err", err)
 		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")

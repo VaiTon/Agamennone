@@ -390,7 +390,6 @@
               }
             ],
             "groupBy": [],
-            "limit": null,
             "orderBy": {
               "property": {
                 "name": "received_time",
@@ -516,7 +515,7 @@
           },
           "editorMode": "code",
           "format": "time_series",
-          "hide": true,
+          "hide": false,
           "rawQuery": true,
           "rawSql": "SELECT\n  COUNT(flag) AS \"flags\",\n  $__timeGroup(sent_time, $__interval) as \"time\",\n  sploit\nFROM\n  agamennone.flags\nWHERE\n  $__timeFilter(received_time)\n  and status = \"accepted\"\nGROUP BY\n  sploit,\n  $__timeGroup(received_time, $__interval)\nORDER BY\n  received_time ASC",
           "refId": "A",
@@ -570,20 +569,6 @@
             "limit": 50
           },
           "table": "flags"
-        },
-        {
-          "datasource": {
-            "name": "Expression",
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "downsampler": "sum",
-          "expression": "A",
-          "hide": false,
-          "refId": "B",
-          "type": "resample",
-          "upsampler": "fillna",
-          "window": "1m"
         }
       ],
       "title": "Accepted flags",
@@ -675,7 +660,7 @@
           },
           "editorMode": "code",
           "format": "time_series",
-          "hide": true,
+          "hide": false,
           "rawQuery": true,
           "rawSql": "SELECT\n  COUNT(flag) AS \"flags\",\n  $__timeGroup(sent_time, $__interval) as \"time\",\n  sploit\nFROM\n  agamennone.flags\nWHERE\n  $__timeFilter(received_time)\n  and status = \"rejected\"\nGROUP BY\n  sploit,\n  $__timeGroup(received_time, $__interval)\nORDER BY\n  received_time ASC",
           "refId": "A",
@@ -729,20 +714,6 @@
             "limit": 50
           },
           "table": "flags"
-        },
-        {
-          "datasource": {
-            "name": "Expression",
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "downsampler": "sum",
-          "expression": "A",
-          "hide": false,
-          "refId": "B",
-          "type": "resample",
-          "upsampler": "fillna",
-          "window": "1m"
         }
       ],
       "title": "Rejected flags",
@@ -756,7 +727,7 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timeRangeUpdatedDuringEditOrView": false,

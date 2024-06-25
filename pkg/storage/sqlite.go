@@ -120,7 +120,7 @@ func (s *SqliteStorage) GetByStatus(status string, limit int) ([]flag.Flag, erro
 	return flags, nil
 }
 
-func NewSqliteStorage(path string) (*SqliteStorage, error) {
+func NewSQliteStorage(path string) (*SqliteStorage, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open sqlite file: %w", err)
