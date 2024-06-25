@@ -31,7 +31,8 @@ Currently supported submitters are:
 ### Clients
 
 Agamennone is compatible with the DestructiveFarm client [^1].
-To use it, follow the instructions in the client repository and configure the client to uses the Agamennone HTTP API.
+
+To use it, either use the original version or the one provided in the `client` folder.
 
 [^1]: https://github.com/UlisseLab/DestructiveFarm/blob/main/docs/en/farm_client.md
 
@@ -65,3 +66,10 @@ To use sqlite, start the database with the `-db` argument set to the sqlite conn
 > SQLite is not recommended for production use.
 >
 > It can't be used with Grafana, so no monitoring is available.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The code under the `client` folder is licensed under the MIT License - see the [client/LICENSE](client/LICENSE) file for
+details.
