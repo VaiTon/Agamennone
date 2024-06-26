@@ -69,7 +69,7 @@ To use sqlite, start the database with the `-db` argument set to the sqlite conn
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL License - see the [LICENSE](LICENSE) file for details.
 
 The code under the `client` folder is licensed under the MIT License - see the [client/LICENSE](client/LICENSE) file for
 details.
