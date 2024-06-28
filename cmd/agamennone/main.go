@@ -93,13 +93,7 @@ func main() {
 
 	s := submitter.NewSubmitter(serverConfig.SubmitterPath, serverConfig.SubmissionPeriod, store)
 	// Start submit loop
-	go func() {
-		err := s.SubmitLoop(ctx)
-		if err != nil {
-			log.Printf("Error in submit loop: %v", err)
-			stop()
-		}
-	}()
+	go s.SubmitLoop(ctx)
 
 	// Wait for interrupt signal
 	<-ctx.Done()

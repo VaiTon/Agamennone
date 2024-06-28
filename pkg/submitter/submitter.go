@@ -73,6 +73,10 @@ func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
 	// check the result: for each line in the output, check if it's OK, ERROR or SKIPPED
 	results := make([]Result, 0, len(flags))
 
+	if len(output) == 0 {
+		return nil, fmt.Errorf("submitter returned an empty output")
+	}
+
 	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -108,73 +112,81 @@ func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
 	return results, nil
 }
 
-func (s *Submitter) SubmitLoop(ctx context.Context) error {
+func (s *Submitter) SubmitLoop(ctx context.Context) {
 	logger := log.WithPrefix("submitter")
 
 	logger.Info("Starting submit loop")
 
-	for {
+	firstRun := true
+	startTime := time.Now()
 
-		startTime := time.Now()
+	for {
+		// If this is not the first run, sleep for the submission period
+		if !firstRun {
+			elapsedTime := time.Since(startTime)
+			sleepTime := time.Duration(s.submitPeriod)*time.Second - elapsedTime
+
+			logger.Debugf("sleeping for %.2fs", sleepTime.Seconds())
+			// Sleep for the submission period
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(sleepTime):
+			}
+
+			startTime = time.Now()
+		}
+		firstRun = false
 
 		// Get all flags from the database that are in the "queued" state
 		flags, err := s.storage.GetByStatus(flag.StatusQueued, 0)
 		if err != nil {
-			return fmt.Errorf("error getting flags from database: %v", err)
+			logger.Errorf("error getting flags from database: %v", err)
+			continue
 		}
 
 		// If there are no flags, sleep for a while and try again
 		if len(flags) == 0 {
 			logger.Debugf("no flags to submit")
-		} else {
+			continue
+		}
 
-			// try to submit the flags
-			submitTime := time.Now()
-			logger.Debug("starting external script", "submitter", s.path)
-			results, err := s.Submit(flags)
+		// try to submit the flags
+		submitTime := time.Now()
+		logger.Debug("starting external script", "submitter", s.path)
+		results, err := s.Submit(flags)
+		if err != nil {
+			logger.Errorf("error submitting flags: %v", err)
+			continue
+		}
+
+		submitElapsedTime := time.Since(submitTime)
+		logger.Debugf("script exited in %.2fs", submitElapsedTime.Seconds())
+
+		// map result to status
+		statuses := make([]string, len(results))
+		for i, result := range results {
+			switch result.Result {
+			case ResultOk:
+				statuses[i] = flag.StatusAccepted
+			case ResultError:
+				statuses[i] = flag.StatusRejected
+			case ResultSkipped:
+				statuses[i] = flag.StatusSkipped
+			default:
+				logger.Printf("Invalid result: %s", result.Result)
+				statuses[i] = flag.StatusQueued
+			}
+		}
+
+		// Update the status of the flags in the database
+		for i := range results {
+			err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitTime)
 			if err != nil {
-				return fmt.Errorf("error submitting flags: %v", err)
+				logger.Errorf("error updating flag in database: %v", err)
 			}
-			submitElapsedTime := time.Since(submitTime)
-			logger.Debugf("script exited in %.2fs", submitElapsedTime.Seconds())
-
-			// map result to status
-			statuses := make([]string, len(results))
-			for i, result := range results {
-				switch result.Result {
-				case ResultOk:
-					statuses[i] = flag.StatusAccepted
-				case ResultError:
-					statuses[i] = flag.StatusRejected
-				case ResultSkipped:
-					statuses[i] = flag.StatusSkipped
-				default:
-					logger.Printf("Invalid result: %s", result.Result)
-					statuses[i] = flag.StatusQueued
-				}
-			}
-
-			// Update the status of the flags in the database
-			for i := range results {
-				err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitTime)
-				if err != nil {
-					return fmt.Errorf("error updating flag status in database: %v", err)
-				}
-			}
-
-			logger.Info("submitted flags", "flags", len(flags))
 		}
 
-		elapsedTime := time.Since(startTime)
-		sleepTime := time.Duration(s.submitPeriod)*time.Second - elapsedTime
-
-		logger.Debugf("sleeping for %.2fs", sleepTime.Seconds())
-		// Sleep for the submission period
-		select {
-		case <-time.After(sleepTime):
-		case <-ctx.Done():
-			return nil
-		}
-
+		logger.Infof("submitted %d flags", len(flags))
 	}
 }
