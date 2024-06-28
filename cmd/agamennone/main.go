@@ -42,7 +42,7 @@ var (
 	configPath   = flag.String("config", "config.json", "path to the configuration file")
 	listenAddr   = flag.String("listen", ":1234", "address to listen on")
 	debug        = flag.Bool("debug", false, "enable debug logging")
-	dbConnStr    = flag.String("db", "mariadb://agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
+	dbConnStr    = flag.String("db", "mysql://agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
 )
 
 var store storage.FlagStorage
