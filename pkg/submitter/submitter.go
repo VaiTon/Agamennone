@@ -67,7 +67,7 @@ func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
 	// capture and parse the output
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("error capturing output: %v", err)
+		return nil, fmt.Errorf("error capturing output: %v. output was: %s", err, string(output))
 	}
 
 	// check the result: for each line in the output, check if it's OK, ERROR or SKIPPED
