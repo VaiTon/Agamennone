@@ -26,12 +26,12 @@ func NewMariaDBStorage(addr string) (*MariaDBStorage, error) {
 func (s *MariaDBStorage) Init() error {
 	const tableInitQuery = `
 		CREATE TABLE IF NOT EXISTS flags (
-			flag 					varchar(50) PRIMARY KEY, 
-			sploit 					varchar(50),
-			team 					varchar(50),
+			flag 					varchar(100) PRIMARY KEY, 
+			sploit 					varchar(100),
+			team 					varchar(100),
 			received_time 			DATETIME, 
 			sent_time 				DATETIME,
-			status 					varchar(50), 
+			status 					varchar(100), 
 			checksystem_response 	varchar(255)
 		                                 
 	 	)
