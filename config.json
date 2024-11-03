@@ -4,6 +4,7 @@
   "flagLifetime": 600,
   "submissionPeriod": 10,
   "submitterPath": "./submitters/dummy.py",
+  "attackInfoUrl": "https://8.enowars.com/scoreboard/attack.json",
   "teams": {
     "team1": "10.0.0.1",
     "team2": "10.0.0.2",

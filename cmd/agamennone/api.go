@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,6 +27,7 @@ func setupRouter(e *echo.Echo) {
 }
 
 func getConfig(c echo.Context) error {
+
 	type clientConfig struct {
 		FlagFormat   string            `json:"FLAG_FORMAT"`
 		SubmitPeriod int               `json:"SUBMIT_PERIOD"`
@@ -32,20 +35,50 @@ func getConfig(c echo.Context) error {
 		Teams        ClientConfigTeams `json:"TEAMS"`
 		AttackInfo   string            `json:"ATTACK_INFO"`
 	}
-	return c.JSON(http.StatusOK, clientConfig{
+
+	config := clientConfig{
 		FlagFormat:   serverConfig.FlagRegexStr,
 		SubmitPeriod: serverConfig.SubmissionPeriod,
 		FlagLifetime: serverConfig.FlagLifetime,
 		Teams:        serverConfig.Teams,
-		AttackInfo:   "",
-	})
+	}
+
+	if serverConfig.AttackInfoUrl != "" {
+		ai, err := getAttackInfo()
+		if err != nil {
+			log.Errorf("error getting attack info: %v", err)
+		} else {
+			config.AttackInfo = ai
+		}
+	}
+	return c.JSON(http.StatusOK, config)
+}
+
+func getAttackInfo() (string, error) {
+	res, err := http.Get(serverConfig.AttackInfoUrl)
+	if err != nil {
+		return "", fmt.Errorf("http get: %w", err)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("parse body: %w", err)
+	}
+
+	err = res.Body.Close()
+	if err != nil {
+		log.Errorf("could not close request body: %v", err)
+	}
+
+	// parse as string
+	return string(body), nil
 }
 
 func getStats(c echo.Context) error {
 
 	stats, err := store.GetStatisticsV1()
 	if err != nil {
-		log.Error("error getting statistics from database", "err", err)
+		log.Errorf("error getting statistics from database: %v", err)
 		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
 	}
 

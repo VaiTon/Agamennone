@@ -35,6 +35,8 @@ type ServerConfig struct {
 	Teams              map[string]string `json:"teams"`
 	SubmitterPath      string            `json:"submitterPath"`
 	FlagRegex          regexp.Regexp
+
+	AttackInfoUrl string `json:"attackInfoUrl"`
 }
 
 var (
