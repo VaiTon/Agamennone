@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	charmlog "github.com/charmbracelet/log"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/VaiTon/Agamennone/pkg/flag"
 )
+
+var log = charmlog.WithPrefix("mariadb")
 
 type MariaDBStorage struct {
 	db *sql.DB
@@ -17,8 +20,10 @@ type MariaDBStorage struct {
 func NewMariaDBStorage(addr string) (*MariaDBStorage, error) {
 	db, err := sql.Open("mysql", addr+"?parseTime=true")
 	if err != nil {
-		return nil, fmt.Errorf("cannot open sqlite file: %w", err)
+		return nil, fmt.Errorf("cannot connect to the database: %w", err)
 	}
+
+	log.Info("Connected to database!")
 
 	return &MariaDBStorage{db}, nil
 }
@@ -26,14 +31,14 @@ func NewMariaDBStorage(addr string) (*MariaDBStorage, error) {
 func (s *MariaDBStorage) Init() error {
 	const tableInitQuery = `
 		CREATE TABLE IF NOT EXISTS flags (
-			flag 					varchar(100) PRIMARY KEY, 
+			flag 					varchar(100) PRIMARY KEY,
 			sploit 					varchar(100),
 			team 					varchar(100),
-			received_time 			DATETIME, 
+			received_time 			DATETIME,
 			sent_time 				DATETIME,
-			status 					varchar(100), 
+			status 					varchar(100),
 			checksystem_response 	varchar(255)
-		                                 
+
 	 	)
 	`
 
@@ -151,7 +156,7 @@ func (s *MariaDBStorage) UpdateSentFlag(flag, status, checkSystemResponse string
 
 func (s *MariaDBStorage) InsertFlags(flags []flag.Flag) (int64, error) {
 	queryString := `
-		INSERT IGNORE INTO agamennone.flags (flag, sploit, team, received_time, sent_time, status, checksystem_response) VALUES 
+		INSERT IGNORE INTO agamennone.flags (flag, sploit, team, received_time, sent_time, status, checksystem_response) VALUES
 	`
 	var values []interface{}
 
