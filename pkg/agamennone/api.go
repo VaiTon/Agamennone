@@ -1,8 +1,7 @@
-package main
+package agamennone
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -26,52 +25,50 @@ func setupRouter(e *echo.Echo) {
 	apiR.GET("/stats", getStats)
 }
 
+type ClientConfig struct {
+	FlagFormat   string            `json:"flag_format"`
+	FlagLifetime int               `json:"flag_lifetime"`
+	Teams        ClientConfigTeams `json:"teams"`
+	SubmitPeriod int               `json:"submit_period"`
+	DataSources  []string          `json:"data_sources"`
+	AttackPeriod string            `json:"attack_periods"`
+}
+
 func getConfig(c echo.Context) error {
 
-	type clientConfig struct {
-		FlagFormat   string            `json:"FLAG_FORMAT"`
-		SubmitPeriod int               `json:"SUBMIT_PERIOD"`
-		FlagLifetime int               `json:"FLAG_LIFETIME"`
-		Teams        ClientConfigTeams `json:"TEAMS"`
-		AttackInfo   string            `json:"ATTACK_INFO"`
-	}
-
-	config := clientConfig{
+	config := ClientConfig{
 		FlagFormat:   serverConfig.FlagRegexStr,
 		SubmitPeriod: serverConfig.SubmissionPeriod,
 		FlagLifetime: serverConfig.FlagLifetime,
 		Teams:        serverConfig.Teams,
+		AttackPeriod: serverConfig.AttackPeriod,
 	}
 
-	if serverConfig.AttackInfoUrl != "" {
-		ai, err := getAttackInfo()
+	dataSourcesContent := make([]string, 0)
+
+	for _, path := range serverConfig.DataSources {
+		res, err := http.Get(path)
 		if err != nil {
-			log.Errorf("error getting attack info: %v", err)
-		} else {
-			config.AttackInfo = ai
+			log.Errorf("error getting data source %s: %v", path, err)
+			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
 		}
+
+		if res.StatusCode != http.StatusOK {
+			log.Errorf("error getting data source %s: %v", path, res.Status)
+			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Errorf("error reading response body: %v", err)
+			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+		}
+
+		dataSourcesContent = append(dataSourcesContent, string(body))
 	}
+
+	config.DataSources = dataSourcesContent
 	return c.JSON(http.StatusOK, config)
-}
-
-func getAttackInfo() (string, error) {
-	res, err := http.Get(serverConfig.AttackInfoUrl)
-	if err != nil {
-		return "", fmt.Errorf("http get: %w", err)
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("parse body: %w", err)
-	}
-
-	err = res.Body.Close()
-	if err != nil {
-		log.Errorf("could not close request body: %v", err)
-	}
-
-	// parse as string
-	return string(body), nil
 }
 
 func getStats(c echo.Context) error {
@@ -137,10 +134,11 @@ func postFlags(c echo.Context) error {
 	}
 
 	log.Info("received flags",
-		"unique_flags", insertedFlags,
-		"valid_flags", len(validFlags),
-		"total_flags", len(partialFlags),
-		"src", c.RealIP())
+		"unique", insertedFlags,
+		"valid", len(validFlags),
+		"total", len(partialFlags),
+		"exploit", validFlags[0].Exploit,
+		"client", c.RealIP())
 
 	return c.NoContent(http.StatusCreated)
 }

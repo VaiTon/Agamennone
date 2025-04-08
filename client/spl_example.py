@@ -16,7 +16,7 @@ host = sys.argv[1]
 
 # The path of the attack info json is passed as the second argument.
 with open(sys.argv[2]) as f:
-    attack_info = json.loads(f.read())
+    attack_info = f.read()
 
 print(f"I need to attack a team with host: {host}")
 print(f"I recieved this attack info: {attack_info}")
@@ -28,5 +28,6 @@ def spam_flag():
     arr = [random.choice(string.ascii_uppercase + string.digits) for _ in range(31)]
     flag = "".join(arr) + "="
     print(flag, flush=True)
+
 
 spam_flag()

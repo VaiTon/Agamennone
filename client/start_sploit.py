@@ -33,9 +33,7 @@ HEADER = r"""
 |____/ \___||___/\__|_|   \__,_|\___|\__|_| \_/ \___| |_|  \__,_|_|  |_| |_| |_
 
 Note that this software is highly destructive. Keep it away from children.
-"""[
-    1:
-]
+"""[1:]
 
 
 class InvalidSploitError(Exception):

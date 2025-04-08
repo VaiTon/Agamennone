@@ -6,11 +6,10 @@ up:
 down:
     {{compose}} down
 
-build:
-    go build ./cmd/agamennone/
+build folder:
+    go build ./cmd/{{folder}}/
 
-run:
-    go run ./cmd/agamennone/
+server: (build "agamennone")
+    ./agamennone
 
-
-
+client: (build "achille")
