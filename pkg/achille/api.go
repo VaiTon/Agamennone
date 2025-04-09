@@ -1,10 +1,12 @@
-package main
+package achille
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/charmbracelet/log"
 
 	"github.com/VaiTon/Agamennone/pkg/agamennone"
 	"github.com/VaiTon/Agamennone/pkg/flag"
@@ -14,7 +16,6 @@ type AgamennoneApi struct {
 	Url string
 
 	client *http.Client
-	config agamennone.ClientConfig
 }
 
 func NewAgamennoneApi(hostname string) *AgamennoneApi {
@@ -25,23 +26,11 @@ func NewAgamennoneApi(hostname string) *AgamennoneApi {
 	return api
 }
 
-func (a *AgamennoneApi) Connect() error {
-	// store config from /config
-	config, err := a.GetConfig()
-	if err != nil {
-		return fmt.Errorf("error getting config: %w", err)
-	}
-
-	a.config = config
-	return nil
-}
-
 func (a *AgamennoneApi) GetConfig() (agamennone.ClientConfig, error) {
 	resp, err := a.client.Get(a.Url + "/api/config")
 	if err != nil {
 		return agamennone.ClientConfig{}, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return agamennone.ClientConfig{}, fmt.Errorf("error getting config: %s", resp.Status)
@@ -52,7 +41,12 @@ func (a *AgamennoneApi) GetConfig() (agamennone.ClientConfig, error) {
 		return agamennone.ClientConfig{}, err
 	}
 
-	a.config = config
+	err = resp.Body.Close()
+	if err != nil {
+		// do not return error, just log it
+		log.Error("error closing response body", "error", err)
+	}
+
 	return config, nil
 }
 
@@ -68,9 +62,8 @@ func (a *AgamennoneApi) SubmitFlags(flags []flag.Flag) error {
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("error submitting flags: %s", resp.Status)
+		return fmt.Errorf("error submitting flags: got status %s", resp.Status)
 	}
 
-	defer resp.Body.Close()
-	return nil
+	return resp.Body.Close()
 }

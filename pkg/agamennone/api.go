@@ -26,12 +26,11 @@ func setupRouter(e *echo.Echo) {
 }
 
 type ClientConfig struct {
-	FlagFormat   string            `json:"flag_format"`
-	FlagLifetime int               `json:"flag_lifetime"`
-	Teams        ClientConfigTeams `json:"teams"`
-	SubmitPeriod int               `json:"submit_period"`
-	DataSources  []string          `json:"data_sources"`
-	AttackPeriod string            `json:"attack_periods"`
+	FlagFormat   string            `json:"FLAG_FORMAT"`
+	FlagLifetime int               `json:"FLAG_LIFETIME"`
+	Teams        ClientConfigTeams `json:"TEAMS"`
+	SubmitPeriod int               `json:"SUBMIT_PERIOD"`
+	DataSources  []string          `json:"DATA_SOURCES"`
 }
 
 func getConfig(c echo.Context) error {
@@ -41,7 +40,6 @@ func getConfig(c echo.Context) error {
 		SubmitPeriod: serverConfig.SubmissionPeriod,
 		FlagLifetime: serverConfig.FlagLifetime,
 		Teams:        serverConfig.Teams,
-		AttackPeriod: serverConfig.AttackPeriod,
 	}
 
 	dataSourcesContent := make([]string, 0)

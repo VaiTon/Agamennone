@@ -10,7 +10,7 @@ services:
       - "${EXPOSE_HOST}:3306:3306"
     restart: on-failure
     volumes:
-      - ./db:/var/lib/mysql
+      - db:/var/lib/mysql
 
   grafana:
     image: grafana/grafana
@@ -26,3 +26,5 @@ services:
       - ./grafana:/etc/grafana/provisioning/
     restart: on-failure
 
+volumes:
+  db:

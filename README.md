@@ -4,11 +4,14 @@ Agamennone is a simple, resilient and scalable flag submission system.
 
 ## Usage
 
-1. Clone the repository
-2. Run `go build ./cmd/agamennone` to build the project
-3. Run `docker-compose up` or `podman-compose up` to start the database and the Grafana instance
-4. Configure the server in the `config.json` file
-5. Run `./agamennone` to start the server
+```
+git clone <repo>
+just build
+just env
+
+# configure the config.json
+./agamennone
+```
 
 ### Submitters
 
@@ -24,7 +27,7 @@ A submitter is an executable that:
 Currently supported submitters are:
 
 | Name    | Language | Description                                                                                                                                                                                   |
-|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `dummy` | Python   | returns a random response for each flag                                                                                                                                                       |
 | `ccit`  | Python   | sends flags to the CyberChallenge game server. Made for the CyberChallenge.IT A/D National Contest. <br/>If you want to use it, you need to provide the team token INSIDE THE SUBMITTER FILE. |
 

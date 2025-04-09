@@ -25,17 +25,15 @@ import (
 type ClientConfigTeams map[string]string
 
 type ServerConfig struct {
-	GameName           string            `json:"gameName"`
-	FlagRegexStr       string            `json:"flagRegex"`
-	SubmissionProtocol string            `json:"submissionProtocol"`
-	SubmissionPeriod   int               `json:"submissionPeriod"`
-	AttackPeriod       string            `json:"attackPeriod"`
-	FlagLifetime       int               `json:"flagLifetime"`
-	ServerHost         string            `json:"serverHost"`
-	ServerPort         int               `json:"serverPort"`
-	Teams              map[string]string `json:"teams"`
-	SubmitterPath      string            `json:"submitterPath"`
-	FlagRegex          regexp.Regexp
+	GameName         string            `json:"gameName"`
+	FlagRegexStr     string            `json:"flagRegex"`
+	SubmissionPeriod int               `json:"submissionPeriod"`
+	FlagLifetime     int               `json:"flagLifetime"`
+	ServerHost       string            `json:"serverHost"`
+	ServerPort       int               `json:"serverPort"`
+	Teams            map[string]string `json:"teams"`
+	SubmitterPath    string            `json:"submitterPath"`
+	FlagRegex        regexp.Regexp
 
 	DataSources []string `json:"dataSources"`
 }
@@ -62,6 +60,14 @@ func Start() {
 	err := loadConfig()
 	if err != nil {
 		log.Fatalf("error loading configuration: %v", err)
+	}
+
+	if serverConfig.SubmitterPath == "" {
+		log.Fatalf("error: submission protocol not set")
+	} else if serverConfig.FlagLifetime == 0 {
+		log.Fatalf("error: flag lifetime not set")
+	} else if serverConfig.SubmissionPeriod == 0 {
+		log.Fatalf("error: submission period not set")
 	}
 
 	store, err = createStorage(*dbConnStr)

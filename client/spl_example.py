@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import hashlib
 import json
 import random
 import string
@@ -17,6 +17,13 @@ host = sys.argv[1]
 # The path of the attack info json is passed as the second argument.
 with open(sys.argv[2]) as f:
     attack_info = f.read()
+
+# simulate some computation
+if random.choice([True, False]):
+    for i in range(1000000):
+        txt = [random.choice(string.ascii_uppercase + string.digits) for _ in range(31)]
+        txt = "".join(txt)
+        hashlib.sha256(txt.encode())
 
 print(f"I need to attack a team with host: {host}")
 print(f"I recieved this attack info: {attack_info}")

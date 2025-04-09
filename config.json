@@ -2,10 +2,11 @@
   "gameName": "My Game",
   "flagRegex": "[a-zA-Z0-9]{31}=",
   "flagLifetime": 600,
-  "attackPeriod": "10s",
-  "attackFrequency": 60,
   "submitterPath": "./submitters/dummy.py",
-  "dataSources": ["https://8.enowars.com/scoreboard/attack.json"],
+  "submissionPeriod": 60,
+  "dataSources": [
+    "https://8.enowars.com/scoreboard/attack.json"
+  ],
   "attackInfoUrl": "https://8.enowars.com/scoreboard/attack.json",
   "teams": {
     "team1": "10.0.0.1",
