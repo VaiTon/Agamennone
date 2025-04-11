@@ -39,7 +39,7 @@ func getConfig(c echo.Context) error {
 		FlagFormat:   serverConfig.FlagRegexStr,
 		SubmitPeriod: serverConfig.SubmissionPeriod,
 		FlagLifetime: serverConfig.FlagLifetime,
-		Teams:        serverConfig.Teams,
+		Teams:        ClientConfigTeams(serverConfig.Teams),
 	}
 
 	dataSourcesContent := make([]string, 0)
@@ -132,11 +132,8 @@ func postFlags(c echo.Context) error {
 	}
 
 	log.Info("received flags",
-		"unique", insertedFlags,
-		"valid", len(validFlags),
-		"total", len(partialFlags),
-		"exploit", validFlags[0].Exploit,
-		"client", c.RealIP())
+		"unique", insertedFlags, "valid", len(validFlags), "total", len(partialFlags),
+		"exploit", validFlags[0].Exploit, "client", c.RealIP())
 
 	return c.NoContent(http.StatusCreated)
 }

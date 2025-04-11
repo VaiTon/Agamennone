@@ -2,9 +2,7 @@ package agamennone
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,39 +36,38 @@ type ServerConfig struct {
 	DataSources []string `json:"dataSources"`
 }
 
-var (
-	serverConfig ServerConfig
-	configPath   = flag.String("config", "config.json", "path to the configuration file")
-	listenAddr   = flag.String("listen", ":1234", "address to listen on")
-	debug        = flag.Bool("debug", false, "enable debug logging")
-	dbConnStr    = flag.String("db", "mysql://agamennone:agamennone@tcp(localhost:3306)/agamennone", "mariadb connection string")
-)
-
 var store storage.FlagStorage
 
-func Start() {
-	flag.Parse()
+type Teams map[string]string
 
-	if *debug {
+type AgamennoneConfig struct {
+	ListenAddr       string        // address to listen on
+	Debug            bool          // enable verbose logging
+	DbConnectionStr  string        // database connection string
+	GameName         string        // name of the game
+	FlagRegexStr     string        // regex to match flags
+	SubmissionPeriod int           // how often to submit flags
+	FlagLifetime     int           // how long flags are valid
+	ServerHost       string        // game server host to submit flags to
+	ServerPort       int           // game server port to submit flags to
+	SubmitterPath    string        // path to the submitter executable
+	Teams            Teams         // map of team names to addresses
+	FlagRegex        regexp.Regexp // compiled regex for matching flags
+	DataSources      []string      // URLs to query to get data for exploits
+}
+
+var serverConfig *AgamennoneConfig
+
+func Start(config *AgamennoneConfig) {
+	// copy the config to the global variable
+	serverConfig = config
+
+	if config.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	// load configuration
-	log.Debug("loading configuration", "path", *configPath)
-	err := loadConfig()
-	if err != nil {
-		log.Fatalf("error loading configuration: %v", err)
-	}
-
-	if serverConfig.SubmitterPath == "" {
-		log.Fatalf("error: submission protocol not set")
-	} else if serverConfig.FlagLifetime == 0 {
-		log.Fatalf("error: flag lifetime not set")
-	} else if serverConfig.SubmissionPeriod == 0 {
-		log.Fatalf("error: submission period not set")
-	}
-
-	store, err = createStorage(*dbConnStr)
+	var err error
+	store, err = createStorage(config.DbConnectionStr)
 	if err != nil {
 		log.Fatalf("error creating storage: %v", err)
 	}
@@ -88,7 +85,7 @@ func Start() {
 		continue
 	}
 
-	log.Info("database initialized successfully", "addr", *dbConnStr)
+	log.Info("database initialized successfully", "addr", config.DbConnectionStr)
 
 	httpLogger := log.WithPrefix("http")
 	e := echo.New()
@@ -104,14 +101,14 @@ func Start() {
 
 	// Start server
 	go func() {
-		httpLogger.Info("starting server", "addr", *listenAddr)
-		if err := e.Start(*listenAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		httpLogger.Info("starting server", "addr", config.ListenAddr)
+		if err := e.Start(config.ListenAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			httpLogger.Fatalf("shutting down server: %v", err)
 		}
 	}()
 
-	s := submitter.NewSubmitter(serverConfig.SubmitterPath, serverConfig.SubmissionPeriod, store)
 	// Start submit loop
+	s := submitter.NewSubmitter(config.SubmitterPath, config.SubmissionPeriod, store)
 	go s.SubmitLoop(ctx)
 
 	// Wait for interrupt signal
@@ -146,34 +143,6 @@ func createStorage(storageConnStr string) (store storage.FlagStorage, err error)
 		err = fmt.Errorf("unsupported database type: %s", connType)
 	}
 	return
-}
-
-func loadConfig() error {
-
-	file, err := os.Open(*configPath)
-	if err != nil {
-		return fmt.Errorf("error opening config file: %v", err)
-	}
-
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&serverConfig)
-	if err != nil {
-		return fmt.Errorf("error decoding config file: %v", err)
-	}
-
-	err = file.Close()
-	if err != nil {
-		return fmt.Errorf("error closing config file: %v", err)
-	}
-
-	flagRegex, err := regexp.Compile(serverConfig.FlagRegexStr)
-	if err != nil {
-		return fmt.Errorf("error compiling flag format regex: %v", err)
-	}
-
-	serverConfig.FlagRegex = *flagRegex
-
-	return nil
 }
 
 func loggingMiddleware(logger *log.Logger) func(echo.HandlerFunc) echo.HandlerFunc {
