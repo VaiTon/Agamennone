@@ -15,8 +15,10 @@ print(
 host = sys.argv[1]
 
 # The path of the attack info json is passed as the second argument.
-with open(sys.argv[2]) as f:
-    attack_info = f.read()
+attack_info = None
+if len(sys.argv) > 2:
+    with open(sys.argv[2]) as f:
+        attack_info = f.read()
 
 # simulate some computation
 if random.choice([True, False]):
@@ -26,7 +28,9 @@ if random.choice([True, False]):
         hashlib.sha256(txt.encode())
 
 print(f"I need to attack a team with host: {host}")
-print(f"I recieved this attack info: {attack_info}")
+
+if attack_info:
+    print(f"I recieved this attack info: {attack_info}")
 
 print("Here are some random flags for you:")
 
