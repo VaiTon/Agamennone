@@ -83,10 +83,12 @@ func Start() {
 		}
 
 		log.Error("error initializing database: %v", err)
-		log.Warnf("is the database running? %s", *dbConnStr)
+		log.Warnf("is the database running? sleeping for 5 seconds...")
 		time.Sleep(5 * time.Second)
 		continue
 	}
+
+	log.Info("database initialized successfully", "addr", *dbConnStr)
 
 	httpLogger := log.WithPrefix("http")
 	e := echo.New()

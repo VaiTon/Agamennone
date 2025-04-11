@@ -40,9 +40,6 @@ type exploitError struct {
 	err  error
 }
 
-// errorExploitTimeout is returned when the exploit times out
-var errorExploitTimeout = errors.New("exploit timed out")
-
 // RunExploit is the main function that runs the exploit.
 //
 // In a loop, it gets the server config, runs the exploit on all teams,
@@ -237,7 +234,7 @@ func collectFlags(
 			flags = append(flags, newFlags.flags...)
 			succeededExploits++
 		case e := <-errorChan:
-			if errors.Is(e.err, errorExploitTimeout) {
+			if errors.Is(e.err, context.DeadlineExceeded) {
 				if localTick == 0 {
 					log.Warn("exploit timed out", "team", e.team.name, "error", e.err)
 				}
@@ -311,14 +308,17 @@ func RunExploitOnTeam(
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "PYTHONUNBUFFERED=1")
 
+	var err error
+
 	// execute the exploit
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, errorExploitTimeout
-		}
-		return nil, err
+
+	// override error if the context is done
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil, context.DeadlineExceeded
 	}
+
+	// ignore (for now) any error
 
 	if exploit.PrintOutput {
 		log.Debug("exploit produced output", "output", string(output))
@@ -333,5 +333,5 @@ func RunExploitOnTeam(
 		flags[i] = flag.Flag{Flag: flagString, Exploit: exploit.Name, Team: team.name}
 	}
 
-	return flags, nil
+	return flags, err
 }
