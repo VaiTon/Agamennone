@@ -23,8 +23,6 @@ func NewMariaDBStorage(addr string) (*MariaDBStorage, error) {
 		return nil, fmt.Errorf("cannot connect to the database: %w", err)
 	}
 
-	log.Info("Connected to database!")
-
 	return &MariaDBStorage{db}, nil
 }
 

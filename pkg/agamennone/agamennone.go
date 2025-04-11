@@ -72,12 +72,20 @@ func Start() {
 
 	store, err = createStorage(*dbConnStr)
 	if err != nil {
-		log.Fatalf("Error creating storage: %v", err)
+		log.Fatalf("error creating storage: %v", err)
 	}
 
-	err = store.Init()
-	if err != nil {
-		log.Fatalf("error initializing database: %v", err)
+	// wait until the database is ready
+	for {
+		err = store.Init()
+		if err == nil {
+			break
+		}
+
+		log.Error("error initializing database: %v", err)
+		log.Warnf("is the database running? %s", *dbConnStr)
+		time.Sleep(5 * time.Second)
+		continue
 	}
 
 	httpLogger := log.WithPrefix("http")
