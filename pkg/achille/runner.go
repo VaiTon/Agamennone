@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/panjf2000/ants/v2"
 
@@ -39,6 +40,8 @@ type exploitError struct {
 	team exploitTeam
 	err  error
 }
+
+var boldColor = lipgloss.NewStyle().Bold(true)
 
 // RunExploit is the main function that runs the exploit.
 //
@@ -77,7 +80,8 @@ turnLoop:
 		config, err := api.GetConfig()
 		if err != nil {
 			log.Error("error getting server config", "error", err)
-			log.Warn("!!! check if the server is online !!!")
+
+			log.Warn(boldColor.Render("!!! check if the server is online !!!"))
 			lastTickFailed = true
 			continue turnLoop
 		}
@@ -129,18 +133,7 @@ turnLoop:
 		log.Info("starting attack", "turn", localTick, "teams", len(config.Teams),
 			"tickPeriod", localTickPeriod, "timeout", exploitConfig.Timeout, "workers", exploitConfig.Workers)
 
-		timePerExploit := localTickPeriod / time.Duration(len(config.Teams))
-		timePerTimeout := timePerExploit * time.Duration(exploitConfig.Workers)
-		if exploitConfig.Timeout > timePerTimeout {
-			log.Warnf("╭──────────ATTENTION─────────")
-			log.Warnf("│   YOU MAY BE LOSING FLAGS  ")
-			log.Warnf("│ exploit timeout is too high!!!")
-			log.Warnf("│ %s / %d teams = %s per exploit, for %d workers = %s max timeout (now got %s)",
-				localTickPeriod, len(config.Teams), timePerExploit,
-				exploitConfig.Workers, timePerTimeout, exploitConfig.Timeout)
-			log.Warnf("│ consider reducing the timeout or increasing the number of workers")
-			log.Warnf("╰────────────────────────────")
-		}
+		warnIfMayLosingFlag(localTickPeriod, exploitConfig.Timeout, len(config.Teams), exploitConfig.Workers)
 
 		// submit to the worker pool an attack for each team
 		errCh := make(chan exploitError, exploitConfig.Workers)
@@ -151,20 +144,8 @@ turnLoop:
 		result := collectFlags(resultsCh, errCh, localTick, len(config.Teams))
 		flags = append(flags, result.flags...)
 
-		if result.errored > 0 {
-			log.Errorf("some exploits errored: %d (%.2f%%)", result.errored,
-				float32(result.errored)/float32(len(config.Teams))*100)
-		}
-
-		if result.timeout > 0 {
-			log.Warnf("some exploits timed out: %d (%.2f%%)", result.timeout,
-				float32(result.timeout)/float32(len(config.Teams))*100)
-		}
-
-		log.Infof("attack finished. attacked %d teams (%.2f%%) and got %d flags (%.2f flags/team)",
-			result.succeeded, float32(result.succeeded)/float32(len(config.Teams))*100,
-			len(result.flags), float32(len(result.flags))/float32(result.succeeded),
-		)
+		// log results to console
+		logAttackResults(result, len(config.Teams))
 
 		// check if we got any flags
 		if len(flags) != 0 {
@@ -251,6 +232,7 @@ func collectFlags(
 			break
 		}
 	}
+
 	return collectFlagsResult{
 		flags:     flags,
 		succeeded: succeededExploits,
@@ -269,10 +251,20 @@ func submitAttacks(
 	errorChan chan<- exploitError,
 	flagChan chan<- exploitResult,
 ) {
+
+	notifyPeriod := config.Timeout / 2
+	notifyTime := time.Now().Add(notifyPeriod)
+
+	attackedTeams := 0
 	for teamName, teamAddr := range teams {
 		team := exploitTeam{name: teamName, addr: teamAddr}
+		if time.Now().After(notifyTime) {
+			log.Infof("still running exploits (%d/%d)", attackedTeams, len(teams))
+			notifyTime = time.Now().Add(notifyPeriod)
+		}
 
 		err := pool.Submit(func() {
+
 			exploitCtx, cancelExploitCtx := context.WithTimeout(context.Background(), config.Timeout)
 			exploitFlags, err := RunExploitOnTeam(exploitCtx, config, data, team)
 			if err != nil {
@@ -287,6 +279,8 @@ func submitAttacks(
 		if err != nil {
 			log.Fatal("error submitting attack to worker pool", "error", err)
 		}
+
+		attackedTeams++
 	}
 }
 
@@ -318,20 +312,57 @@ func RunExploitOnTeam(
 		return nil, context.DeadlineExceeded
 	}
 
-	// ignore (for now) any error
+	// ignore any error. we will return them later
 
 	if exploit.PrintOutput {
 		log.Debug("exploit produced output", "output", string(output))
 	}
 
+	flags := extractFlags(data.flagRegex, output, exploit, team)
+	return flags, err
+}
+
+func extractFlags(regex *regexp.Regexp, output []byte, exploit *ExploitConfig, team exploitTeam) []flag.Flag {
 	// extract the flags from the output
-	flagStrings := data.flagRegex.FindAllString(string(output), -1)
+	flagStrings := regex.FindAll(output, -1)
 
 	// add info to flags
 	flags := make([]flag.Flag, len(flagStrings))
 	for i, flagString := range flagStrings {
-		flags[i] = flag.Flag{Flag: flagString, Exploit: exploit.Name, Team: team.name}
+		flags[i] = flag.Flag{Flag: string(flagString), Exploit: exploit.Name, Team: team.name}
 	}
 
-	return flags, err
+	return flags
+}
+
+func warnIfMayLosingFlag(tickLength, exploitTimeout time.Duration, teams, workers int) {
+	timePerExploit := tickLength / time.Duration(teams)
+	timePerTimeout := timePerExploit * time.Duration(workers)
+	if exploitTimeout > timePerTimeout {
+		log.Warnf("╭──────────" + boldColor.Render("ATTENTION") + "─────────")
+		log.Warnf("│   YOU MAY BE LOSING FLAGS  ")
+		log.Warnf("│ exploit timeout is too high!!!")
+		log.Warnf("│ %s / %d teams = %s per exploit, for %d workers = %s max timeout (now got %s)",
+			tickLength, teams, timePerExploit, workers, timePerTimeout, exploitTimeout)
+		log.Warnf("│ consider reducing the timeout or increasing the number of workers")
+		log.Warnf("╰────────────────────────────")
+	}
+}
+
+func logAttackResults(result collectFlagsResult, teams int) {
+	if result.errored > 0 {
+		percentErr := float32(result.errored) / float32(teams) * 100
+		log.Errorf("some exploits errored: %d (%.2f%%)", result.errored, percentErr)
+	}
+
+	if result.timeout > 0 {
+		percentTout := float32(result.timeout) / float32(teams) * 100
+		log.Warnf("some exploits timed out: %d (%.2f%%)", result.timeout, percentTout)
+	}
+
+	percentAttacked := float32(result.succeeded) / float32(teams) * 100
+	flagsPerTeam := float32(len(result.flags)) / float32(result.succeeded)
+
+	log.Infof("attack finished. attacked %d teams (%.2f%%) and got %d flags (%.2f flags/team)",
+		result.succeeded, percentAttacked, len(result.flags), flagsPerTeam)
 }

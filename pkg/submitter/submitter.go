@@ -39,8 +39,9 @@ func NewSubmitter(path string, submitPeriod int, storage storage.FlagStorage) *S
 	return &Submitter{storage: storage, path: path, submitPeriod: submitPeriod}
 }
 
-// Submit sends a flag to the Agamennone server.
-func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
+// Submit executes the external submitter script with the given flags
+// and returns the results
+func (s *Submitter) Submit(ctx context.Context, flags []flag.Flag) ([]Result, error) {
 
 	// check if the path exists and is a file
 	if _, err := os.Stat(s.path); os.IsNotExist(err) {
@@ -61,7 +62,7 @@ func (s *Submitter) Submit(flags []flag.Flag) ([]Result, error) {
 	}
 
 	// execute the file, passing flags via stdin, \n is used as a delimiter
-	cmd := exec.Command(s.path)
+	cmd := exec.CommandContext(ctx, s.path)
 	cmd.Stdin = strings.NewReader(strings.Join(flagsTxts, "\n"))
 
 	// capture and parse the output
@@ -154,7 +155,7 @@ func (s *Submitter) SubmitLoop(ctx context.Context) {
 		// try to submit the flags
 		submitTime := time.Now()
 		logger.Debug("starting external script", "submitter", s.path)
-		results, err := s.Submit(flags)
+		results, err := s.Submit(ctx, flags)
 		if err != nil {
 			logger.Errorf("error submitting flags: %v", err)
 			continue
