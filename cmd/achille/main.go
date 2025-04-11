@@ -45,6 +45,7 @@ var (
 	exploitOutput bool
 	exploitName   string
 	timeout       int
+	workers       int
 )
 
 func init() {
@@ -56,6 +57,7 @@ func init() {
 	pFlags.StringVarP(&exploitName, "exploit", "e", "", "Exploit name")
 	pFlags.BoolVarP(&exploitOutput, "output", "o", false, "Print the exploit output")
 	pFlags.IntVarP(&timeout, "timeout", "t", 10, "Timeout for the exploit in seconds")
+	pFlags.IntVarP(&workers, "workers", "w", 4, "Number of workers to use for the exploit")
 
 	rootCmd.AddCommand(createCmd)
 }
@@ -98,7 +100,9 @@ func RootCommand(cmd *cobra.Command, args []string) {
 		Name:        exploitName,
 		PrintOutput: exploitOutput,
 		Timeout:     time.Second * time.Duration(timeout),
+		Workers:     workers,
 	}
 
+	// run the exploit
 	achille.RunExploit(api, exploitConfig)
 }

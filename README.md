@@ -2,15 +2,46 @@
 
 Agamennone is a simple, resilient and scalable flag submission system.
 
-## Usage
+## Client usage
+
+Agamennone has its own client, Achille, but it can also be used with the DestructiveFarm client [^1].
+
+```shell
+just client
+./achille -h
+```
+
+or install it to your path via
+
+```shell
+just install
+achille -h
+```
+
+### Niceness and CPU usage
+
+To reduce CPU usage, consider using `nice` and `taskset` to set the process priority and CPU affinity.
+
+```shell
+# set the process niceness to 10 (lower than default) and use only CPU 0-7
+nice -n 10 taskset -c 0-7 ./achille
+```
+
+### DestructiveFarm client
+
+To use it, either use the original version or the one provided in the `client` folder.
+
+[^1]: https://github.com/UlisseLab/DestructiveFarm/blob/main/docs/en/farm_client.md
+
+## Server usage
+
+You need docker compose and Go installed to run the server.
 
 ```
-git clone <repo>
-just build
 just env
-
 # configure the config.json
-./agamennone
+
+just server
 ```
 
 ### Submitters
@@ -30,14 +61,6 @@ Currently supported submitters are:
 | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `dummy` | Python   | returns a random response for each flag                                                                                                                                                       |
 | `ccit`  | Python   | sends flags to the CyberChallenge game server. Made for the CyberChallenge.IT A/D National Contest. <br/>If you want to use it, you need to provide the team token INSIDE THE SUBMITTER FILE. |
-
-### Clients
-
-Agamennone is compatible with the DestructiveFarm client [^1].
-
-To use it, either use the original version or the one provided in the `client` folder.
-
-[^1]: https://github.com/UlisseLab/DestructiveFarm/blob/main/docs/en/farm_client.md
 
 ## Storage
 

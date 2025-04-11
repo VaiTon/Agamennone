@@ -16,21 +16,19 @@ import (
 )
 
 type ExploitConfig struct {
-	Name        string
-	Path        string
-	PrintOutput bool
-	Timeout     time.Duration
+	Name        string        // name of the exploit that is sent to the server
+	Path        string        // path to the exploit
+	PrintOutput bool          // whether to print the exploit output to the console
+	Timeout     time.Duration // timeout for the exploit run
+	Workers     int           // how many exploits can run in parallel
 }
 
 type exploitServerData struct {
-	flagRegex *regexp.Regexp
-	dataPaths []string
+	flagRegex *regexp.Regexp // regex to match flags in the exploit output
+	dataPaths []string       // paths to the data sources, which are passed to the exploit
 }
 
-type exploitTeam struct {
-	name string
-	addr string
-}
+type exploitTeam struct{ name, addr string }
 
 type exploitResult struct {
 	team  exploitTeam
@@ -42,8 +40,13 @@ type exploitError struct {
 	err  error
 }
 
+// errorExploitTimeout is returned when the exploit times out
 var errorExploitTimeout = errors.New("exploit timed out")
 
+// RunExploit is the main function that runs the exploit.
+//
+// In a loop, it gets the server config, runs the exploit on all teams,
+// and submits the flags to the server.
 func RunExploit(api *AgamennoneApi, exploitConfig *ExploitConfig) {
 
 	log.Debug("starting exploit runner", "config", exploitConfig)
@@ -57,9 +60,8 @@ func RunExploit(api *AgamennoneApi, exploitConfig *ExploitConfig) {
 	localTick := 0
 	lastTickFailed := false
 
-	workers := 16 // TODO: make this configurable
-	log.Debug("creating worker pool", "size", workers)
-	workersPool, err := ants.NewPool(workers)
+	log.Debug("creating worker pool", "size", exploitConfig.Workers)
+	workersPool, err := ants.NewPool(exploitConfig.Workers)
 	if err != nil {
 		log.Fatal("error creating worker pool", "error", err)
 	}
@@ -128,11 +130,24 @@ turnLoop:
 		localTickPeriod := time.Duration(config.SubmitPeriod) * time.Second
 
 		log.Info("starting attack", "turn", localTick, "teams", len(config.Teams),
-			"tickPeriod", localTickPeriod, "timeout", exploitConfig.Timeout)
+			"tickPeriod", localTickPeriod, "timeout", exploitConfig.Timeout, "workers", exploitConfig.Workers)
+
+		timePerExploit := localTickPeriod / time.Duration(len(config.Teams))
+		timePerTimeout := timePerExploit * time.Duration(exploitConfig.Workers)
+		if exploitConfig.Timeout > timePerTimeout {
+			log.Warnf("╭──────────ATTENTION─────────")
+			log.Warnf("│   YOU MAY BE LOSING FLAGS  ")
+			log.Warnf("│ exploit timeout is too high!!!")
+			log.Warnf("│ %s / %d teams = %s per exploit, for %d workers = %s max timeout (now got %s)",
+				localTickPeriod, len(config.Teams), timePerExploit,
+				exploitConfig.Workers, timePerTimeout, exploitConfig.Timeout)
+			log.Warnf("│ consider reducing the timeout or increasing the number of workers")
+			log.Warnf("╰────────────────────────────")
+		}
 
 		// submit to the worker pool an attack for each team
-		errCh := make(chan exploitError, workers)
-		resultsCh := make(chan exploitResult, workers)
+		errCh := make(chan exploitError, exploitConfig.Workers)
+		resultsCh := make(chan exploitResult, exploitConfig.Workers)
 		go submitAttacks(config.Teams, workersPool, exploitConfig, serverData, errCh, resultsCh)
 
 		// accumulate flags from all coroutines
@@ -182,15 +197,19 @@ turnLoop:
 			log.Info("finished attack. sleeping until next turn", "duration", remainingTime)
 			time.Sleep(remainingTime)
 		} else {
-			log.Warnf("running exploit took too long. running %d seconds late", -remainingTime.Seconds())
-			log.Warn("consider reducing exploit timeout or optimizing the exploit")
-			log.Warn("YOU MAY NOT BE ATTACKING ALL TEAMS")
+			log.Warnf("╭──────────ATTENTION─────────")
+			log.Warnf("│ YOU MAY NOT BE ATTACKING ALL TEAMS")
+			log.Warnf("│ running exploit took too long!!!")
+			log.Warnf("│ attack took %s, but tick period is %s", time.Since(startTime), localTickPeriod)
+			log.Warnf("│ consider reducing exploit timeout or optimizing the exploit")
+			log.Warnf("╰────────────────────────────")
 		}
 
 		localTick++
 	}
 }
 
+// collectFlags stores a result by collectFlags
 type collectFlagsResult struct {
 	succeeded int
 	errored   int
@@ -198,6 +217,9 @@ type collectFlagsResult struct {
 	flags     []flag.Flag
 }
 
+// collectFlags collects the flags from the channels until all exploits are either
+// successful or errored out. It returns the flags and the number of successful,
+// errored, and timed out exploits.
 func collectFlags(
 	flagChan chan exploitResult,
 	errorChan chan exploitError,
@@ -221,7 +243,9 @@ func collectFlags(
 				}
 				timeoutExploits++
 			} else {
-				log.Error("error running exploit", "team", e.team.name, "error", e.err)
+				if localTick == 0 {
+					log.Error("error running exploit", "team", e.team.name, "error", e.err)
+				}
 				erroredExploits++
 			}
 		}

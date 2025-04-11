@@ -2,7 +2,7 @@
 
 import sys, requests
 
-TEAM_TOKEN = "4242424242424242"
+TEAM_TOKEN = "840ade564d40b2f82f11ef0d0087fda3"
 
 # read flags from stdin
 flags = [f.strip() for f in sys.stdin.readlines()]
