@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/panjf2000/ants/v2"
 
@@ -41,8 +40,6 @@ type exploitError struct {
 	err  error
 }
 
-var boldColor = lipgloss.NewStyle().Bold(true)
-
 // RunExploit is the main function that runs the exploit.
 //
 // In a loop, it gets the server config, runs the exploit on all teams,
@@ -63,7 +60,7 @@ func RunExploit(api *AgamennoneApi, exploitConfig *ExploitConfig) {
 	log.Debug("creating worker pool", "size", exploitConfig.Workers)
 	workersPool, err := ants.NewPool(exploitConfig.Workers)
 	if err != nil {
-		log.Fatal("error creating worker pool", "error", err)
+		log.Fatal("error creating worker pool", "err", err)
 	}
 
 turnLoop:
@@ -79,9 +76,9 @@ turnLoop:
 		// get server config
 		config, err := api.GetConfig()
 		if err != nil {
-			log.Error("error getting server config", "error", err)
+			log.Error("error getting server config", "err", err)
 
-			log.Warn(boldColor.Render("!!! check if the server is online !!!"))
+			log.Warn("!!! check if the server is online !!!")
 			lastTickFailed = true
 			continue turnLoop
 		}
@@ -89,7 +86,7 @@ turnLoop:
 		// compile the flag regex
 		flagRegex, err := regexp.Compile(config.FlagFormat)
 		if err != nil {
-			log.Error("error compiling flag regex", "error", err)
+			log.Error("error compiling flag regex", "err", err)
 			log.Warn("!!! check the server config !!!")
 			lastTickFailed = true
 			continue turnLoop
@@ -100,21 +97,21 @@ turnLoop:
 		for _, dataSource := range config.DataSources {
 			dataSourceFile, err := os.CreateTemp("", "achille-data-source-")
 			if err != nil {
-				log.Error("error creating data source temp file", "error", err)
+				log.Error("error creating data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
 
 			_, err = dataSourceFile.Write([]byte(dataSource))
 			if err != nil {
-				log.Error("error writing data source temp file", "error", err)
+				log.Error("error writing data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
 
 			err = dataSourceFile.Close()
 			if err != nil {
-				log.Error("error closing data source temp file", "error", err)
+				log.Error("error closing data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
@@ -151,7 +148,7 @@ turnLoop:
 		if len(flags) != 0 {
 			err := api.SubmitFlags(flags)
 			if err != nil {
-				log.Debug("error submitting flags", "error", err)
+				log.Debug("error submitting flags", "err", err)
 			} else {
 				log.Debug("submitted flags", "count", len(flags))
 
@@ -164,7 +161,7 @@ turnLoop:
 		for _, dataPath := range dataPaths {
 			err := os.Remove(dataPath)
 			if err != nil {
-				log.Error("error deleting temp file", "file", dataPath, "error", err)
+				log.Error("error deleting temp file", "file", dataPath, "err", err)
 			}
 		}
 		log.Debug("deleted data sources temp files", "files", dataPaths)
@@ -217,12 +214,12 @@ func collectFlags(
 		case e := <-errorChan:
 			if errors.Is(e.err, context.DeadlineExceeded) {
 				if localTick == 0 {
-					log.Warn("exploit timed out", "team", e.team.name, "error", e.err)
+					log.Warn("exploit timed out", "team", e.team.name, "err", e.err)
 				}
 				timeoutExploits++
 			} else {
 				if localTick == 0 {
-					log.Error("error running exploit", "team", e.team.name, "error", e.err)
+					log.Error("error running exploit", "team", e.team.name, "err", e.err)
 				}
 				erroredExploits++
 			}
@@ -277,7 +274,7 @@ func submitAttacks(
 		})
 
 		if err != nil {
-			log.Fatal("error submitting attack to worker pool", "error", err)
+			log.Fatal("error submitting attack to worker pool", "err", err)
 		}
 
 		attackedTeams++
@@ -339,7 +336,7 @@ func warnIfMayLosingFlag(tickLength, exploitTimeout time.Duration, teams, worker
 	timePerExploit := tickLength / time.Duration(teams)
 	timePerTimeout := timePerExploit * time.Duration(workers)
 	if exploitTimeout > timePerTimeout {
-		log.Warnf("╭──────────" + boldColor.Render("ATTENTION") + "─────────")
+		log.Warnf("╭──────────ATTENTION─────────")
 		log.Warnf("│   YOU MAY BE LOSING FLAGS  ")
 		log.Warnf("│ exploit timeout is too high!!!")
 		log.Warnf("│ %s / %d teams = %s per exploit, for %d workers = %s max timeout (now got %s)",

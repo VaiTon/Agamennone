@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -73,6 +74,8 @@ func RootCommand(cmd *cobra.Command, args []string) {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	setLogStyles()
+
 	host := viper.GetString("host")
 	if host == "" {
 		log.Fatal("Host not set. Use -H or --host to set the host and port of the Agamennone server.")
@@ -105,4 +108,35 @@ func RootCommand(cmd *cobra.Command, args []string) {
 
 	// run the exploit
 	achille.RunExploit(api, exploitConfig)
+}
+
+func setLogStyles() {
+	log.SetTimeFormat(time.TimeOnly)
+
+	styles := log.DefaultStyles()
+	styles.Timestamp = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	styles.Levels[log.InfoLevel] = styles.Levels[log.InfoLevel].
+		Padding(0, 2, 0, 0).MaxWidth(6)
+
+	styles.Levels[log.DebugLevel] = styles.Levels[log.DebugLevel].
+		Padding(0, 2, 0, 0).MaxWidth(6)
+
+	styles.Levels[log.FatalLevel] = styles.Levels[log.FatalLevel].
+		Padding(0, 2, 0, 0).MaxWidth(6)
+
+	styles.Levels[log.WarnLevel] = styles.Levels[log.WarnLevel].
+		Padding(0, 2, 0, 0).MaxWidth(6)
+
+	styles.Levels[log.ErrorLevel] = styles.Levels[log.ErrorLevel].
+		Padding(0, 1, 0, 1).MaxWidth(6).
+		SetString("ERRO").
+		Background(lipgloss.Color("204")).
+		Foreground(lipgloss.Color("0"))
+
+	// override for key "err"
+	styles.Keys["err"] = lipgloss.NewStyle().Foreground(lipgloss.Color("204"))
+	styles.Values["err"] = lipgloss.NewStyle().Bold(true)
+
+	log.SetStyles(styles)
 }

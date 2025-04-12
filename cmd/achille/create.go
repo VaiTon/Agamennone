@@ -77,13 +77,13 @@ func runCreate(cmd *cobra.Command, args []string) {
 	}
 
 	if err := os.MkdirAll(name, 0755); err != nil {
-		log.Error("Failed to create directory", "path", name, "error", err)
+		log.Error("Failed to create directory", "path", name, "err", err)
 		os.Exit(1)
 	}
 
 	exploitFile := filepath.Join(name, "exploit.py")
 	if err := os.WriteFile(exploitFile, []byte(template), 0755); err != nil {
-		log.Error("Failed to create exploit file", "path", exploitFile, "error", err)
+		log.Error("Failed to create exploit file", "path", exploitFile, "err", err)
 		os.Exit(1)
 	}
 

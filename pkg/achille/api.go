@@ -39,7 +39,7 @@ func (a *AgamennoneApi) GetConfig() (*agamennone.ClientConfig, error) {
 	err = resp.Body.Close()
 	if err != nil {
 		// do not return error, just log it
-		log.Error("can't close response body", "error", err)
+		log.Error("can't close response body", "err", err)
 	}
 
 	return config, nil
