@@ -263,7 +263,7 @@ func submitAttacks(
 		err := pool.Submit(func() {
 
 			exploitCtx, cancelExploitCtx := context.WithTimeout(context.Background(), config.Timeout)
-			exploitFlags, err := RunExploitOnTeam(exploitCtx, config, data, team)
+			exploitFlags, err := runExploitOnTeam(exploitCtx, config, data, team)
 			if err != nil {
 				errorChan <- exploitError{team, err}
 				cancelExploitCtx()
@@ -281,7 +281,7 @@ func submitAttacks(
 	}
 }
 
-func RunExploitOnTeam(
+func runExploitOnTeam(
 	ctx context.Context,
 	exploit *ExploitConfig,
 	data *exploitServerData,
