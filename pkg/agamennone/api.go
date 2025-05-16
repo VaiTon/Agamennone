@@ -2,6 +2,7 @@ package agamennone
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -64,8 +65,7 @@ func getStats(c echo.Context) error {
 
 	stats, err := store.GetStatisticsV1()
 	if err != nil {
-		log.Errorf("error getting statistics from database: %v", err)
-		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+		return internalError(c, err)
 	}
 
 	type serverStats struct {
@@ -118,8 +118,7 @@ func postFlags(c echo.Context) error {
 
 	insertedFlags, err := store.InsertFlags(validFlags)
 	if err != nil {
-		log.Error("error inserting flags into database", "err", err)
-		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+		return internalError(c, fmt.Errorf("inserting flags into database: %v", err))
 	}
 
 	log.Info("received flags",
@@ -146,8 +145,7 @@ func getFlags(c echo.Context) error {
 
 	flags, err := store.GetLastFlags(limit)
 	if err != nil {
-		log.Error("error getting flags from database", "err", err)
-		return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+		return internalError(c, err)
 	}
 
 	type apiFlag struct {
@@ -188,8 +186,14 @@ func (r *Router) getCache(c echo.Context) error {
 	err := r.cachingProxy.HandleRequest(url, c.Response().Writer)
 	if err != nil {
 		log.Error("error fetching cache", "err", err)
-		return c.String(http.StatusInternalServerError, "Error fetching cache: "+err.Error())
+		return internalError(c, err)
 	}
 
 	return nil
+}
+
+// logs the error and returns a 500 Internal Server Error
+func internalError(c echo.Context, err error) error {
+	_ = c.String(http.StatusInternalServerError, "Oops! Something went wrong")
+	return fmt.Errorf("internal server error: %v", err)
 }

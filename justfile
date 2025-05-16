@@ -22,8 +22,8 @@ build folder:
 _build_server: (build "agamennone")
 _build_client: (build "achille")
 
-server: (build "agamennone") up
-    ./agamennone
+server *ARGS: (build "agamennone") up
+    ./agamennone {{ARGS}}
 
 client: _build_client
 
@@ -41,18 +41,18 @@ setup-cgroups:
     #!/bin/bash
     set -euo pipefail
     if [ ! -f ~/.config/systemd/user/exploits.slice ]; then
+        echo "CGroups slice not found, creating..."
         mkdir -p ~/.config/systemd/user
         echo << EOF | tee ~/.config/systemd/user/exploits.slice
         [Slice]
         CPUQuota=30%
     EOF
-
         systemctl --user daemon-reload
     fi
 
     systemctl --user start exploits.slice
 
-    echo "🛠️  Cgroups slice setup complete"
+    echo "🛠️  Cgroups slice setup complete!"
 
 
 clean-cgroups:
