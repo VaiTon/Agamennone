@@ -4,6 +4,8 @@ import os
 import random
 import string
 
+import requests
+
 print(
     "Hello! I am a little sploit. I could be written on any language, but "
     "my author loves Python. Look at my source - it is really simple. "
@@ -11,10 +13,16 @@ print(
 )
 
 # The farm host ip and port
-farm_host = os.environ.get("FARM_HOST")
+cache_url = os.environ.get("CACHE_URL")
 
 # The host to attack is passed as the first argument
 target = os.environ.get("TARGET")
+
+# I want to get the flagids but cache them!
+flagids_url = f"{cache_url}https://example.com"
+res = requests.get(flagids_url)
+print(f"Got flagids from {flagids_url}: {res.text}")
+
 
 # simulate some computation
 if random.choice([True, False]):
@@ -24,7 +32,7 @@ if random.choice([True, False]):
         hashlib.sha256(txt.encode())
 
 print(f"I need to attack a team with host: {target}")
-print(f"I can query the farm at: {farm_host}")
+print(f"I can query the farm at: {cache_url}")
 print("Here are some random flags for you:")
 
 

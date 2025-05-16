@@ -10,16 +10,25 @@ import (
 	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
+type CachedResponse struct {
+	Body       []byte
+	StatusCode int
+	Headers    http.Header
+}
+
 type Proxy struct {
 	allowedPrefixes []string
 	client          *http.Client
 
-	cache *expirable.LRU[string, []byte]
+	cache *expirable.LRU[string, *CachedResponse]
 }
 
 func NewCachingProxy(allowedPrefixes []string, cacheDuration time.Duration, client *http.Client) *Proxy {
-	cache := expirable.NewLRU[string, []byte](1000, nil, cacheDuration)
-	return &Proxy{allowedPrefixes: allowedPrefixes, client: client, cache: cache}
+	return &Proxy{
+		allowedPrefixes: allowedPrefixes,
+		client:          client,
+		cache:           expirable.NewLRU[string, *CachedResponse](1000, nil, cacheDuration),
+	}
 }
 
 func (p *Proxy) isAllowed(url string) bool {
@@ -44,12 +53,23 @@ func (p *Proxy) HandleRequest(url string, resp http.ResponseWriter) error {
 	}
 
 	// Check if the URL is already in the cache
-	if cachedData, found := p.cache.Get(url); found {
+	if cachedReq, found := p.cache.Get(url); found {
+		// Write the cached response status code
+		resp.WriteHeader(cachedReq.StatusCode)
+
 		// Write the cached data to the writer
-		_, err := resp.Write(cachedData)
+		_, err := resp.Write(cachedReq.Body)
 		if err != nil {
 			return fmt.Errorf("error writing cached data: %w", err)
 		}
+
+		// Write the headers from the cached response
+		for key, values := range cachedReq.Headers {
+			for _, value := range values {
+				resp.Header().Add(key, value)
+			}
+		}
+
 		return nil
 	}
 
@@ -80,8 +100,15 @@ func (p *Proxy) HandleRequest(url string, resp http.ResponseWriter) error {
 		return fmt.Errorf("error closing upstream response body: %w", err)
 	}
 
+	// Create a new CachedResponse
+	cachedResp := &CachedResponse{
+		Body:       writer.Bytes(),
+		StatusCode: upstream.StatusCode,
+		Headers:    upstream.Header,
+	}
+
 	// Cache the response body
-	_ = p.cache.Add(url, writer.Bytes())
+	_ = p.cache.Add(url, cachedResp)
 
 	// Write the response body to the writer
 	_, err = resp.Write(writer.Bytes())

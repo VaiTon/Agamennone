@@ -300,7 +300,7 @@ func runExploitOnTeam(
 	// set the environment variables for the exploit
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "PYTHONUNBUFFERED=1")
-	cmd.Env = append(cmd.Env, "FARM_HOST="+data.agamennoneHost)
+	cmd.Env = append(cmd.Env, "CACHE_URL="+data.agamennoneHost+"/api/cache?url=")
 	cmd.Env = append(cmd.Env, "TARGET="+team.addr)
 
 	log.Debug("running exploit", "command", cmd.String(), "team", team.name)
