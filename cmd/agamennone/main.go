@@ -6,9 +6,10 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/VaiTon/Agamennone/pkg/agamennone"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+
+	"github.com/VaiTon/Agamennone/pkg/agamennone"
 )
 
 const header = `
@@ -80,7 +81,7 @@ func Run(cmd *cobra.Command, args []string) {
 		log.Fatalf("error compiling flag regex. check your config: %v", err)
 	}
 
-	config := &agamennone.AgamennoneConfig{
+	config := &agamennone.Config{
 		ListenAddr:       listenAddr,
 		Debug:            debug,
 		DbConnectionStr:  dbConnStr,
@@ -93,7 +94,7 @@ func Run(cmd *cobra.Command, args []string) {
 		ServerPort:       fileConfig.ServerPort,
 		SubmitterPath:    fileConfig.SubmitterPath,
 		Teams:            fileConfig.Teams,
-		DataSources:      fileConfig.DataSources,
+		AllowedURLs:      fileConfig.AllowedURLs,
 	}
 
 	agamennone.Start(config)

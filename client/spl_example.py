@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import hashlib
-import json
+import os
 import random
 import string
-import sys
 
 print(
     "Hello! I am a little sploit. I could be written on any language, but "
@@ -11,14 +10,11 @@ print(
     "I should steal flags and print them on stdout or stderr. "
 )
 
-# The host to attack is passed as the first argument.
-host = sys.argv[1]
+# The farm host ip and port
+farm_host = os.environ.get("FARM_HOST")
 
-# The path of the attack info json is passed as the second argument.
-attack_info = None
-if len(sys.argv) > 2:
-    with open(sys.argv[2]) as f:
-        attack_info = f.read()
+# The host to attack is passed as the first argument
+target = os.environ.get("TARGET")
 
 # simulate some computation
 if random.choice([True, False]):
@@ -27,11 +23,8 @@ if random.choice([True, False]):
         txt = "".join(txt)
         hashlib.sha256(txt.encode())
 
-print(f"I need to attack a team with host: {host}")
-
-if attack_info:
-    print(f"I recieved this attack info: {attack_info}")
-
+print(f"I need to attack a team with host: {target}")
+print(f"I can query the farm at: {farm_host}")
 print("Here are some random flags for you:")
 
 

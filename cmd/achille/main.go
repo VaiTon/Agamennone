@@ -104,6 +104,7 @@ func RootCommand(cmd *cobra.Command, args []string) {
 		PrintOutput: exploitOutput,
 		Timeout:     time.Second * time.Duration(timeout),
 		Workers:     workers,
+		FarmHost:    host,
 	}
 
 	// run the exploit

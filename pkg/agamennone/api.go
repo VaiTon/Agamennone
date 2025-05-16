@@ -2,7 +2,6 @@ package agamennone
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,19 +9,37 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 
+	"github.com/VaiTon/Agamennone/pkg/cachingproxy"
 	"github.com/VaiTon/Agamennone/pkg/flag"
 )
 
-func setupRouter(e *echo.Echo) {
-	e.GET("/", func(c echo.Context) error {
+type Router struct {
+	serverConfig *Config
+	echo         *echo.Echo
+	cachingProxy *cachingproxy.Proxy
+}
+
+func NewRouter(e *echo.Echo, config *Config) *Router {
+	cacheDuration := time.Duration(config.SubmissionPeriod) * time.Second
+	cachingProxy := cachingproxy.NewCachingProxy(config.AllowedURLs, cacheDuration, http.DefaultClient)
+	return &Router{
+		echo:         e,
+		serverConfig: config,
+		cachingProxy: cachingProxy,
+	}
+}
+
+func (r *Router) setupRouter() {
+	r.echo.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Welcome to Agamennone!")
 	})
 
-	apiR := e.Group("/api")
+	apiR := r.echo.Group("/api")
 	apiR.GET("/config", getConfig)
 	apiR.POST("/flags", postFlags)
 	apiR.GET("/flags", getFlags)
 	apiR.GET("/stats", getStats)
+	apiR.GET("/cache", r.getCache)
 }
 
 type ClientConfig struct {
@@ -34,39 +51,13 @@ type ClientConfig struct {
 }
 
 func getConfig(c echo.Context) error {
-
-	config := ClientConfig{
+	return c.JSON(http.StatusOK, ClientConfig{
 		FlagFormat:   serverConfig.FlagRegexStr,
 		SubmitPeriod: serverConfig.SubmissionPeriod,
 		FlagLifetime: serverConfig.FlagLifetime,
 		Teams:        ClientConfigTeams(serverConfig.Teams),
-	}
-
-	dataSourcesContent := make([]string, 0)
-
-	for _, path := range serverConfig.DataSources {
-		res, err := http.Get(path)
-		if err != nil {
-			log.Errorf("error getting data source %s: %v", path, err)
-			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
-		}
-
-		if res.StatusCode != http.StatusOK {
-			log.Errorf("error getting data source %s: %v", path, res.Status)
-			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			log.Errorf("error reading response body: %v", err)
-			return c.String(http.StatusInternalServerError, "Oops! Something went wrong")
-		}
-
-		dataSourcesContent = append(dataSourcesContent, string(body))
-	}
-
-	config.DataSources = dataSourcesContent
-	return c.JSON(http.StatusOK, config)
+		DataSources:  []string{}, // TODO: remove this now that we have the proxy
+	})
 }
 
 func getStats(c echo.Context) error {
@@ -186,4 +177,19 @@ func getFlags(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, apiFlags)
+}
+
+func (r *Router) getCache(c echo.Context) error {
+	url := c.QueryParam("url")
+	if url == "" {
+		return c.String(http.StatusBadRequest, "Missing url parameter")
+	}
+
+	err := r.cachingProxy.HandleRequest(url, c.Response().Writer)
+	if err != nil {
+		log.Error("error fetching cache", "err", err)
+		return c.String(http.StatusInternalServerError, "Error fetching cache: "+err.Error())
+	}
+
+	return nil
 }

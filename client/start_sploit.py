@@ -16,8 +16,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from math import ceil
-from pathlib import Path
-from tempfile import gettempdir
 from typing import List, Set
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
@@ -92,7 +90,7 @@ def parse_args():
         "--interpreter",
         metavar="COMMAND",
         help="Explicitly specify sploit interpreter (use on Windows, which doesn't "
-        "understand shebangs)",
+             "understand shebangs)",
     )
 
     parser.add_argument(
@@ -101,8 +99,8 @@ def parse_args():
         type=int,
         default=50,
         help="Maximal number of concurrent sploit instances. "
-        "Too little value will make time limits for sploits smaller, "
-        "too big will eat all RAM on your computer",
+             "Too little value will make time limits for sploits smaller, "
+             "too big will eat all RAM on your computer",
     )
     parser.add_argument(
         "--attack-period",
@@ -110,8 +108,8 @@ def parse_args():
         type=float,
         default=120,
         help="Rerun the sploit on all teams each N seconds "
-        "Too little value will make time limits for sploits smaller, "
-        "too big will miss flags from some rounds",
+             "Too little value will make time limits for sploits smaller, "
+             "too big will miss flags from some rounds",
     )
 
     parser.add_argument(
@@ -133,7 +131,7 @@ def parse_args():
         "--distribute",
         metavar="K/N",
         help="Divide the team list to N parts (by address hash modulo N) "
-        "and run the sploits only on Kth part of it (K >= 1)",
+             "and run the sploits only on Kth part of it (K >= 1)",
     )
 
     return parser.parse_args()
@@ -146,9 +144,9 @@ def highlight(text, style=None):
     if style is None:
         style = [Style.BOLD, random.choice(BRIGHT_COLORS)]
     return (
-        "\033[{}m".format(";".join(str(item.value) for item in style))
-        + text
-        + "\033[0m"
+            "\033[{}m".format(";".join(str(item.value) for item in style))
+            + text
+            + "\033[0m"
     )
 
 
@@ -261,10 +259,12 @@ if os_windows:
 
     win_ignore_ctrl_c = PHANDLER_ROUTINE()  # = NULL
 
+
     def _errcheck_bool(result, _, args):
         if not result:
             raise ctypes.WinError(ctypes.get_last_error())
         return args
+
 
     # BOOL WINAPI SetConsoleCtrlHandler(
     #   _In_opt_ PHANDLER_ROUTINE HandlerRoutine,
@@ -273,12 +273,14 @@ if os_windows:
     kernel32.SetConsoleCtrlHandler.errcheck = _errcheck_bool
     kernel32.SetConsoleCtrlHandler.argtypes = (PHANDLER_ROUTINE, wintypes.BOOL)
 
+
     @PHANDLER_ROUTINE
     def win_ctrl_handler(dwCtrlType):
         if dwCtrlType == signal.CTRL_C_EVENT:
             kernel32.SetConsoleCtrlHandler(win_ignore_ctrl_c, True)
             shutdown()
         return False
+
 
     kernel32.SetConsoleCtrlHandler(win_ctrl_handler, True)
 
@@ -373,7 +375,6 @@ class FlagStorage:
 
 
 flag_storage = FlagStorage()
-
 
 POST_PERIOD = 5
 
@@ -478,13 +479,15 @@ instance_lock = threading.RLock()
 
 
 def launch_sploit(
-    args, team_name, team_addr: str, attack_no, flag_format, attack_info_path: Path
+        args, team_name, team_addr: str, attack_no, flag_format
 ):
     # For sploits written in Python, this env variable forces the interpreter to flush
     # stdout and stderr after each newline. Note that this is not default behavior
     # if the sploit's output is redirected to a pipe.
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["FARM_HOST"] = args.server_url
+    env["TARGET"] = team_addr
 
     command = [os.path.abspath(args.sploit)]
 
@@ -493,9 +496,6 @@ def launch_sploit(
 
     if team_addr is not None:
         command.append(team_addr)
-
-    if attack_info_path is not None:
-        command.append(attack_info_path.absolute())
 
     need_close_fds = not os_windows
 
@@ -527,13 +527,12 @@ def launch_sploit(
 
 
 def run_sploit(
-    args,
-    team_name,
-    team_addr,
-    attack_no,
-    max_runtime,
-    flag_format,
-    attack_info_path: Path,
+        args,
+        team_name,
+        team_addr,
+        attack_no,
+        max_runtime,
+        flag_format,
 ):
     try:
         with instance_lock:
@@ -541,7 +540,7 @@ def run_sploit(
                 return
 
             proc, instance_id = launch_sploit(
-                args, team_name, team_addr, attack_no, flag_format, attack_info_path
+                args, team_name, team_addr, attack_no, flag_format
             )
     except Exception as e:
         if isinstance(e, FileNotFoundError):
@@ -583,7 +582,7 @@ def run_sploit(
 def show_time_limit_info(args, config, max_runtime, attack_no):
     if attack_no == 1:
         min_attack_period = (
-            config["FLAG_LIFETIME"] - config["SUBMIT_PERIOD"] - POST_PERIOD
+                config["FLAG_LIFETIME"] - config["SUBMIT_PERIOD"] - POST_PERIOD
         )
         if args.attack_period >= min_attack_period:
             logging.warning(
@@ -641,17 +640,6 @@ def get_target_teams(args, teams, attack_no):
     return teams
 
 
-def create_attack_file(config, sploit_name: str) -> Path:
-    name = sploit_name.split(".")[0]
-    path = Path(gettempdir(), f"attack_info_{name}.json")
-
-    # Dump attack info in file
-    with path.open("w") as f:
-        json.dump(config["ATTACK_INFO"], f)
-
-    return path
-
-
 def main(args):
     try:
         fix_args(args)
@@ -690,8 +678,6 @@ def main(args):
                 return
             continue
 
-        attack_info_path = create_attack_file(config, args.sploit)
-
         print()
         logging.info("Launching an attack #{}".format(attack_no))
 
@@ -706,8 +692,7 @@ def main(args):
                 team_addr,
                 attack_no,
                 max_runtime,
-                flag_format,
-                attack_info_path,
+                flag_format
             )
 
 

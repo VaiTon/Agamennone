@@ -31,16 +31,14 @@ type ServerConfig struct {
 	ServerPort       int               `json:"serverPort"`
 	Teams            map[string]string `json:"teams"`
 	SubmitterPath    string            `json:"submitterPath"`
-	FlagRegex        regexp.Regexp
-
-	DataSources []string `json:"dataSources"`
+	AllowedURLs      []string          `json:"allowedURLs"`
 }
 
 var store storage.FlagStorage
 
 type Teams map[string]string
 
-type AgamennoneConfig struct {
+type Config struct {
 	ListenAddr       string        // address to listen on
 	Debug            bool          // enable verbose logging
 	DbConnectionStr  string        // database connection string
@@ -53,12 +51,12 @@ type AgamennoneConfig struct {
 	SubmitterPath    string        // path to the submitter executable
 	Teams            Teams         // map of team names to addresses
 	FlagRegex        regexp.Regexp // compiled regex for matching flags
-	DataSources      []string      // URLs to query to get data for exploits
+	AllowedURLs      []string      // URLs to query to get data for exploits
 }
 
-var serverConfig *AgamennoneConfig
+var serverConfig *Config
 
-func Start(config *AgamennoneConfig) {
+func Start(config *Config) {
 	// copy the config to the global variable
 	serverConfig = config
 
@@ -79,7 +77,7 @@ func Start(config *AgamennoneConfig) {
 			break
 		}
 
-		log.Error("error initializing database: %v", err)
+		log.Errorf("unable to initialize the database: %v", err)
 		log.Warnf("is the database running? sleeping for 5 seconds...")
 		time.Sleep(5 * time.Second)
 		continue
@@ -93,7 +91,9 @@ func Start(config *AgamennoneConfig) {
 	e.Logger.SetOutput(io.Discard)
 	logMiddleware := loggingMiddleware(httpLogger)
 	e.Use(logMiddleware)
-	setupRouter(e)
+
+	router := NewRouter(e, config)
+	router.setupRouter()
 
 	// Handle interrupt signal
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -111,7 +111,7 @@ func Start(config *AgamennoneConfig) {
 	s := submitter.NewSubmitter(config.SubmitterPath, config.SubmissionPeriod, store)
 	go s.SubmitLoop(ctx)
 
-	// Wait for interrupt signal
+	// Wait for the interrupt signal
 	<-ctx.Done()
 	log.Printf("Shutting down server...")
 

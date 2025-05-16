@@ -4,7 +4,10 @@
   "flagLifetime": 600,
   "submitterPath": "./submitters/dummy.py",
   "submissionPeriod": 60,
-  "dataSources": [],
+  "allowedURLs": [
+    "https://example.com",
+    "https://another-example.com"
+  ],
   "teams": {
     "team1": "10.0.0.1",
     "team2": "10.0.0.2",

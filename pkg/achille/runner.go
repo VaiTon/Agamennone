@@ -21,11 +21,13 @@ type ExploitConfig struct {
 	PrintOutput bool          // whether to print the exploit output to the console
 	Timeout     time.Duration // timeout for the exploit run
 	Workers     int           // how many exploits can run in parallel
+	FarmHost    string        // host and port of the Agamennone server
 }
 
 type exploitServerData struct {
-	flagRegex *regexp.Regexp // regex to match flags in the exploit output
-	dataPaths []string       // paths to the data sources, which are passed to the exploit
+	agamennoneHost string         // host and port of the Agamennone server
+	flagRegex      *regexp.Regexp // regex to match flags in the exploit output
+	dataPaths      []string       // paths to the data sources, which are passed to the exploit
 }
 
 type exploitTeam struct{ name, addr string }
@@ -121,8 +123,9 @@ turnLoop:
 
 		log.Debug("Data sources", "files", dataPaths)
 		serverData := &exploitServerData{
-			flagRegex: flagRegex,
-			dataPaths: dataPaths,
+			agamennoneHost: exploitConfig.FarmHost,
+			flagRegex:      flagRegex,
+			dataPaths:      dataPaths,
 		}
 
 		localTickPeriod := time.Duration(config.SubmitPeriod) * time.Second
@@ -293,11 +296,14 @@ func runExploitOnTeam(
 	}
 
 	cmd := exec.CommandContext(ctx, exploit.Path, args...)
-	log.Debug("running exploit", "command", cmd.String())
 
 	// set the environment variables for the exploit
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "PYTHONUNBUFFERED=1")
+	cmd.Env = append(cmd.Env, "FARM_HOST="+data.agamennoneHost)
+	cmd.Env = append(cmd.Env, "TARGET="+team.addr)
+
+	log.Debug("running exploit", "command", cmd.String(), "team", team.name)
 
 	var err error
 
