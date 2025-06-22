@@ -1,47 +1,43 @@
 package agamennone
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 
 	"github.com/VaiTon/Agamennone/pkg/cachingproxy"
 	"github.com/VaiTon/Agamennone/pkg/flag"
+	"github.com/VaiTon/Agamennone/pkg/storage"
 )
 
-type Router struct {
-	serverConfig *Config
+type ServerConfig struct {
+	Store            storage.FlagStorage
+	SubmissionPeriod int
+	FlagRegex        *regexp.Regexp
+	FlagLifetime     int
+	Teams            map[string]string
+	SubmitterPath    string
+	DataSources      []string
+	AllowedURLs      []string
+}
+
+type Server struct {
+	*ServerConfig
 	echo         *echo.Echo
 	cachingProxy *cachingproxy.Proxy
 }
 
-func NewRouter(e *echo.Echo, config *Config) *Router {
-	cacheDuration := time.Duration(config.SubmissionPeriod) * time.Second
-	cachingProxy := cachingproxy.NewCachingProxy(config.AllowedURLs, cacheDuration, http.DefaultClient)
-	return &Router{
-		echo:         e,
-		serverConfig: config,
-		cachingProxy: cachingProxy,
-	}
-}
+type ClientConfigTeams map[string]string
 
-func (r *Router) setupRouter() {
-	r.echo.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Welcome to Agamennone!")
-	})
-
-	apiR := r.echo.Group("/api")
-	apiR.GET("/config", getConfig)
-	apiR.POST("/flags", postFlags)
-	apiR.GET("/flags", getFlags)
-	apiR.GET("/stats", getStats)
-	apiR.GET("/cache", r.getCache)
-}
+type Teams map[string]string
 
 type ClientConfig struct {
 	FlagFormat   string            `json:"FLAG_FORMAT"`
@@ -51,19 +47,57 @@ type ClientConfig struct {
 	DataSources  []string          `json:"DATA_SOURCES"`
 }
 
-func getConfig(c echo.Context) error {
+func NewServer(config *ServerConfig) (*Server, error) {
+	e := echo.New()
+	e.HideBanner = true
+	e.Logger.SetOutput(io.Discard)
+
+	logMiddleware := loggingMiddleware(slog.Default())
+	e.Use(logMiddleware)
+
+	cacheDuration := time.Duration(config.SubmissionPeriod) * time.Second
+	cachingProxy := cachingproxy.NewCachingProxy(config.AllowedURLs, cacheDuration, http.DefaultClient)
+
+	srv := &Server{
+		ServerConfig: config,
+		echo:         e,
+		cachingProxy: cachingProxy,
+	}
+
+	e.GET("/", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Welcome to Agamennone!")
+	})
+
+	apiR := e.Group("/api")
+	apiR.GET("/config", srv.getConfig)
+	apiR.POST("/flags", srv.postFlags)
+	apiR.GET("/flags", srv.getFlags)
+	apiR.GET("/stats", srv.getStats)
+	apiR.GET("/cache", srv.getCache)
+
+	e.GET("/health", func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
+	return srv, nil
+}
+
+func (s *Server) Start(addr string) error            { return s.echo.Start(addr) }
+func (s *Server) Shutdown(ctx context.Context) error { return s.echo.Shutdown(ctx) }
+
+func (s *Server) getConfig(c echo.Context) error {
 	return c.JSON(http.StatusOK, ClientConfig{
-		FlagFormat:   serverConfig.FlagRegexStr,
-		SubmitPeriod: serverConfig.SubmissionPeriod,
-		FlagLifetime: serverConfig.FlagLifetime,
-		Teams:        ClientConfigTeams(serverConfig.Teams),
+		FlagFormat:   s.FlagRegex.String(),
+		SubmitPeriod: s.SubmissionPeriod,
+		FlagLifetime: s.FlagLifetime,
+		Teams:        ClientConfigTeams(s.Teams),
 		DataSources:  []string{}, // TODO: remove this now that we have the proxy
 	})
 }
 
-func getStats(c echo.Context) error {
+func (s *Server) getStats(c echo.Context) error {
 
-	stats, err := store.GetStatisticsV1()
+	stats, err := s.Store.GetStatisticsV1()
 	if err != nil {
 		return internalError(c, err)
 	}
@@ -87,7 +121,7 @@ func getStats(c echo.Context) error {
 	})
 }
 
-func postFlags(c echo.Context) error {
+func (s *Server) postFlags(c echo.Context) error {
 	receivedTime := time.Now()
 
 	body := c.Request().Body
@@ -102,7 +136,7 @@ func postFlags(c echo.Context) error {
 	// Filter out invalid flags
 	validFlags := make([]flag.Flag, 0, len(partialFlags))
 	for _, partialFlag := range partialFlags {
-		if serverConfig.FlagRegex.MatchString(partialFlag.Flag) {
+		if s.FlagRegex.MatchString(partialFlag.Flag) {
 			validFlags = append(validFlags, partialFlag)
 		}
 	}
@@ -116,19 +150,19 @@ func postFlags(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "No valid flags")
 	}
 
-	insertedFlags, err := store.InsertFlags(validFlags)
+	insertedFlags, err := s.Store.InsertFlags(validFlags)
 	if err != nil {
 		return internalError(c, fmt.Errorf("inserting flags into database: %v", err))
 	}
 
-	log.Info("received flags",
+	slog.Info("received flags",
 		"unique", insertedFlags, "valid", len(validFlags), "total", len(partialFlags),
 		"exploit", validFlags[0].Exploit, "client", c.RealIP())
 
 	return c.NoContent(http.StatusCreated)
 }
 
-func getFlags(c echo.Context) error {
+func (s *Server) getFlags(c echo.Context) error {
 	var (
 		err   error
 		limit = 100
@@ -143,7 +177,7 @@ func getFlags(c echo.Context) error {
 		}
 	}
 
-	flags, err := store.GetLastFlags(limit)
+	flags, err := s.Store.GetLastFlags(limit)
 	if err != nil {
 		return internalError(c, err)
 	}
@@ -177,7 +211,7 @@ func getFlags(c echo.Context) error {
 	return c.JSON(http.StatusOK, apiFlags)
 }
 
-func (r *Router) getCache(c echo.Context) error {
+func (r *Server) getCache(c echo.Context) error {
 	url := c.QueryParam("url")
 	if url == "" {
 		return c.String(http.StatusBadRequest, "Missing url parameter")
@@ -185,15 +219,9 @@ func (r *Router) getCache(c echo.Context) error {
 
 	err := r.cachingProxy.HandleRequest(url, c.Response().Writer)
 	if err != nil {
-		log.Error("error fetching cache", "err", err)
+		slog.Error("error fetching cache", "err", err)
 		return internalError(c, err)
 	}
 
 	return nil
-}
-
-// logs the error and returns a 500 Internal Server Error
-func internalError(c echo.Context, err error) error {
-	_ = c.String(http.StatusInternalServerError, "Oops! Something went wrong")
-	return fmt.Errorf("internal server error: %v", err)
 }

@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/log"
+	"github.com/lmittmann/tint"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -51,8 +52,10 @@ var (
 func init() {
 	viper.AutomaticEnv()
 	pFlags := rootCmd.PersistentFlags()
+
 	pFlags.StringP("host", "H", "http://localhost:1234", "Host and port of the Agamennone server")
 	viper.BindPFlag("host", pFlags.Lookup("host"))
+
 	pFlags.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	pFlags.StringVarP(&exploitName, "exploit", "e", "", "Exploit name")
 	pFlags.BoolVarP(&exploitOutput, "output", "o", false, "Print the exploit output")
@@ -64,31 +67,33 @@ func init() {
 
 func main() {
 	println(header)
+	setupLogger()
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		slog.Error("command failed", "err", err)
+		os.Exit(1)
 	}
 }
 
 func RootCommand(cmd *cobra.Command, args []string) {
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
-
-	setLogStyles()
 
 	host := viper.GetString("host")
 	if host == "" {
-		log.Fatal("Host not set. Use -H or --host to set the host and port of the Agamennone server.")
+		slog.Error("Host not set. Use -H or --host to set the host and port of the Agamennone server.")
+		os.Exit(1)
 	}
 
-	log.Info("Starting Achille...", "host", host)
+	slog.Info("Starting Achille...", "host", host)
 	api := achille.NewAgamennoneApi(host)
 
 	// resolve exploit path
 	exploit := args[0]
 	path, err := exec.LookPath(exploit)
 	if err != nil {
-		log.Fatal("error finding exploit", "exploit", exploit, "error", err)
+		slog.Error("executable exploit not found", "path", exploit, "error", err)
+		os.Exit(1)
 	}
 
 	// if the exploit name is not set, use the last part of the path
@@ -96,7 +101,7 @@ func RootCommand(cmd *cobra.Command, args []string) {
 		exploitName = filepath.Base(path)
 	}
 
-	log.Info("running exploit", "exploit", exploitName, "path", path)
+	slog.Info("running exploit", "exploit", exploitName, "path", path)
 
 	exploitConfig := &achille.ExploitConfig{
 		Path:        path,
@@ -111,33 +116,10 @@ func RootCommand(cmd *cobra.Command, args []string) {
 	achille.RunExploit(api, exploitConfig)
 }
 
-func setLogStyles() {
-	log.SetTimeFormat(time.TimeOnly)
-
-	styles := log.DefaultStyles()
-	styles.Timestamp = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-
-	styles.Levels[log.InfoLevel] = styles.Levels[log.InfoLevel].
-		Padding(0, 2, 0, 0).MaxWidth(6)
-
-	styles.Levels[log.DebugLevel] = styles.Levels[log.DebugLevel].
-		Padding(0, 2, 0, 0).MaxWidth(6)
-
-	styles.Levels[log.FatalLevel] = styles.Levels[log.FatalLevel].
-		Padding(0, 2, 0, 0).MaxWidth(6)
-
-	styles.Levels[log.WarnLevel] = styles.Levels[log.WarnLevel].
-		Padding(0, 2, 0, 0).MaxWidth(6)
-
-	styles.Levels[log.ErrorLevel] = styles.Levels[log.ErrorLevel].
-		Padding(0, 1, 0, 1).MaxWidth(6).
-		SetString("ERRO").
-		Background(lipgloss.Color("204")).
-		Foreground(lipgloss.Color("0"))
-
-	// override for key "err"
-	styles.Keys["err"] = lipgloss.NewStyle().Foreground(lipgloss.Color("204"))
-	styles.Values["err"] = lipgloss.NewStyle().Bold(true)
-
-	log.SetStyles(styles)
+func setupLogger() {
+	handler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      slog.LevelInfo,
+		TimeFormat: time.TimeOnly,
+	})
+	slog.SetDefault(slog.New(handler))
 }

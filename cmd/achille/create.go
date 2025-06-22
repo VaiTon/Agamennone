@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/log"
+	"log/slog"
 	"github.com/spf13/cobra"
 )
 
@@ -68,25 +68,25 @@ if __name__ == "__main__":
 
 func runCreate(cmd *cobra.Command, args []string) {
 	name := args[0]
-	log.Info("Creating exploit", "path", name)
+	slog.Info("Creating exploit", "path", name)
 
 	stat, err := os.Stat(name)
 	if !force && err == nil && stat.IsDir() || os.IsExist(err) {
-		log.Error("File exists. Run with --force to overwrite", "path", name)
+		slog.Error("File exists. Run with --force to overwrite", "path", name)
 		os.Exit(1)
 	}
 
 	if err := os.MkdirAll(name, 0755); err != nil {
-		log.Error("Failed to create directory", "path", name, "err", err)
+		slog.Error("Failed to create directory", "path", name, "err", err)
 		os.Exit(1)
 	}
 
 	exploitFile := filepath.Join(name, "exploit.py")
 	if err := os.WriteFile(exploitFile, []byte(template), 0755); err != nil {
-		log.Error("Failed to create exploit file", "path", exploitFile, "err", err)
+		slog.Error("Failed to create exploit file", "path", exploitFile, "err", err)
 		os.Exit(1)
 	}
 
-	log.Info("Exploit created", "path", exploitFile)
+	slog.Info("Exploit created", "path", exploitFile)
 
 }

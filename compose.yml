@@ -1,4 +1,25 @@
+name: agamennone
+
 services:
+  agamennone:
+    build: "."
+    depends_on:
+      - db
+    volumes:
+      - ./config.json:/app/config.json
+      - ./submitters/:/app/submitters/
+    command:
+      [
+        "--verbose",
+        "--config",
+        "/app/config.json",
+        "--db",
+        "mysql://agamennone:agamennone@tcp(db:3306)/agamennone",
+      ]
+    ports:
+      - "${EXPOSE_HOST}:1234:1234"
+    restart: on-failure
+
   db:
     image: mariadb
     environment:

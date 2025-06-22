@@ -1,41 +1,37 @@
 compose := "docker compose"
 
-default: _build_client _build_server
+default: achille agamennone
     @echo "🚀 Build complete!"
 
 env:
     cp .env.example .env
 
-up:
-    {{compose}} up -d
+services-up *ARGS:
+    {{compose}} up -d {{ARGS}}
 
-down *ARGS:
+services-down *ARGS:
     {{compose}} down {{ARGS}}
 
-clean:
+services-clean:
     {{compose}} down --volumes
 
-build folder:
+_build folder:
     go build ./cmd/{{folder}}/
 
+agamennone: (_build "agamennone")
+achille: (_build "achille")
 
-_build_server: (build "agamennone")
-_build_client: (build "achille")
-
-server *ARGS: (build "agamennone") up
-    ./agamennone {{ARGS}}
-
-client: _build_client
+up: services-up agamennone
+    @echo "Starting the server..."
+    ./agamennone
 
 install:
     go install ./cmd/agamennone
     go install ./cmd/achille
-    @echo "📦 Installed the server and client binaries"
-
+    @echo "🚀 Installed the server and client binaries"
 
 escape_analysis:
     go build -o /dev/null -gcflags '-m -l' ./...
-
 
 setup-cgroups:
     #!/bin/bash
@@ -68,8 +64,7 @@ clean-cgroups:
     echo "🧹 Cleaned up cgroups slice"
 
 
-
-exploit *ARGS: _build_client setup-cgroups
+exploit *ARGS: achille
     systemd-run --user --pty \
         --slice=exploits.slice \
         --property=CPUQuota=30% \

@@ -3,12 +3,12 @@ package achille
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"regexp"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/panjf2000/ants/v2"
 
 	"github.com/VaiTon/Agamennone/pkg/agamennone"
@@ -48,7 +48,7 @@ type exploitError struct {
 // and submits the flags to the server.
 func RunExploit(api *AgamennoneApi, exploitConfig *ExploitConfig) {
 
-	log.Debug("starting exploit runner", "config", exploitConfig)
+	slog.Debug("starting exploit runner", "config", exploitConfig)
 
 	// we initialize this outside the loop to make sure that if
 	// the server goes offline we can keep getting flags
@@ -59,16 +59,17 @@ func RunExploit(api *AgamennoneApi, exploitConfig *ExploitConfig) {
 	localTick := 0
 	lastTickFailed := false
 
-	log.Debug("creating worker pool", "size", exploitConfig.Workers)
+	slog.Debug("creating worker pool", "size", exploitConfig.Workers)
 	workersPool, err := ants.NewPool(exploitConfig.Workers)
 	if err != nil {
-		log.Fatal("error creating worker pool", "err", err)
+		slog.Error("error creating worker pool", "err", err)
+		os.Exit(1)
 	}
 
 turnLoop:
 	for {
 		if lastTickFailed {
-			log.Warn("waiting 5 seconds before retrying")
+			slog.Warn("waiting 5 seconds before retrying")
 			time.Sleep(5 * time.Second)
 		}
 
@@ -78,9 +79,9 @@ turnLoop:
 		// get server config
 		config, err := api.GetConfig()
 		if err != nil {
-			log.Error("error getting server config", "err", err)
+			slog.Error("error getting server config", "err", err)
 
-			log.Warn("!!! check if the server is online !!!")
+			slog.Warn("!!! check if the server is online !!!")
 			lastTickFailed = true
 			continue turnLoop
 		}
@@ -88,8 +89,8 @@ turnLoop:
 		// compile the flag regex
 		flagRegex, err := regexp.Compile(config.FlagFormat)
 		if err != nil {
-			log.Error("error compiling flag regex", "err", err)
-			log.Warn("!!! check the server config !!!")
+			slog.Error("error compiling flag regex", "err", err)
+			slog.Warn("!!! check the server config !!!")
 			lastTickFailed = true
 			continue turnLoop
 		}
@@ -99,21 +100,21 @@ turnLoop:
 		for _, dataSource := range config.DataSources {
 			dataSourceFile, err := os.CreateTemp("", "achille-data-source-")
 			if err != nil {
-				log.Error("error creating data source temp file", "err", err)
+				slog.Error("error creating data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
 
 			_, err = dataSourceFile.Write([]byte(dataSource))
 			if err != nil {
-				log.Error("error writing data source temp file", "err", err)
+				slog.Error("error writing data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
 
 			err = dataSourceFile.Close()
 			if err != nil {
-				log.Error("error closing data source temp file", "err", err)
+				slog.Error("error closing data source temp file", "err", err)
 				lastTickFailed = true
 				continue turnLoop
 			}
@@ -121,7 +122,7 @@ turnLoop:
 			dataPaths = append(dataPaths, dataSourceFile.Name())
 		}
 
-		log.Debug("Data sources", "files", dataPaths)
+		slog.Debug("Data sources", "files", dataPaths)
 		serverData := &exploitServerData{
 			agamennoneHost: exploitConfig.FarmHost,
 			flagRegex:      flagRegex,
@@ -130,7 +131,7 @@ turnLoop:
 
 		localTickPeriod := time.Duration(config.SubmitPeriod) * time.Second
 
-		log.Info("starting attack", "turn", localTick, "teams", len(config.Teams),
+		slog.Info("starting attack", "turn", localTick, "teams", len(config.Teams),
 			"tickPeriod", localTickPeriod, "timeout", exploitConfig.Timeout, "workers", exploitConfig.Workers)
 
 		warnIfMayLosingFlag(localTickPeriod, exploitConfig.Timeout, len(config.Teams), exploitConfig.Workers)
@@ -151,9 +152,9 @@ turnLoop:
 		if len(flags) != 0 {
 			err := api.SubmitFlags(flags)
 			if err != nil {
-				log.Debug("error submitting flags", "err", err)
+				slog.Debug("error submitting flags", "err", err)
 			} else {
-				log.Debug("submitted flags", "count", len(flags))
+				slog.Debug("submitted flags", "count", len(flags))
 
 				// if we successfully submitted the flags, we can clear the slice
 				flags = make([]flag.Flag, 0)
@@ -164,23 +165,23 @@ turnLoop:
 		for _, dataPath := range dataPaths {
 			err := os.Remove(dataPath)
 			if err != nil {
-				log.Error("error deleting temp file", "file", dataPath, "err", err)
+				slog.Error("error deleting temp file", "file", dataPath, "err", err)
 			}
 		}
-		log.Debug("deleted data sources temp files", "files", dataPaths)
+		slog.Debug("deleted data sources temp files", "files", dataPaths)
 
 		// sleep until the next turn
 		remainingTime := time.Until(startTime.Add(localTickPeriod))
 		if remainingTime > 0 {
-			log.Info("finished attack. sleeping until next turn", "duration", remainingTime)
+			slog.Info("finished attack. sleeping until next turn", "duration", remainingTime)
 			time.Sleep(remainingTime)
 		} else {
-			log.Warnf("╭──────────ATTENTION─────────")
-			log.Warnf("│ YOU MAY NOT BE ATTACKING ALL TEAMS")
-			log.Warnf("│ running exploit took too long!!!")
-			log.Warnf("│ attack took %s, but tick period is %s", time.Since(startTime), localTickPeriod)
-			log.Warnf("│ consider reducing exploit timeout or optimizing the exploit")
-			log.Warnf("╰────────────────────────────")
+			slog.Warn("╭────────ATTENTION────────")
+			slog.Warn("│ YOU MAY NOT BE ATTACKING ALL TEAMS")
+			slog.Warn("│ running exploit took too long!!!")
+			slog.Warn("│ attack took", "duration", time.Since(startTime), "tickPeriod", localTickPeriod)
+			slog.Warn("│ consider reducing exploit timeout or optimizing the exploit")
+			slog.Warn("╰────────────────────────")
 		}
 
 		localTick++
@@ -217,12 +218,12 @@ func collectFlags(
 		case e := <-errorChan:
 			if errors.Is(e.err, context.DeadlineExceeded) {
 				if localTick == 0 {
-					log.Warn("exploit timed out", "team", e.team.name, "err", e.err)
+					slog.Warn("exploit timed out", "team", e.team.name, "err", e.err)
 				}
 				timeoutExploits++
 			} else {
 				if localTick == 0 {
-					log.Error("error running exploit", "team", e.team.name, "err", e.err)
+					slog.Error("error running exploit", "team", e.team.name, "err", e.err)
 				}
 				erroredExploits++
 			}
@@ -259,7 +260,7 @@ func submitAttacks(
 	for teamName, teamAddr := range teams {
 		team := exploitTeam{name: teamName, addr: teamAddr}
 		if time.Now().After(notifyTime) {
-			log.Infof("still running exploits (%d/%d)", attackedTeams, len(teams))
+			slog.Info("still running exploits", "done", attackedTeams, "total", len(teams))
 			notifyTime = time.Now().Add(notifyPeriod)
 		}
 
@@ -277,7 +278,8 @@ func submitAttacks(
 		})
 
 		if err != nil {
-			log.Fatal("error submitting attack to worker pool", "err", err)
+			slog.Error("error submitting attack to worker pool", "err", err)
+			os.Exit(1)
 		}
 
 		attackedTeams++
@@ -303,7 +305,7 @@ func runExploitOnTeam(
 	cmd.Env = append(cmd.Env, "CACHE_URL="+data.agamennoneHost+"/api/cache?url=")
 	cmd.Env = append(cmd.Env, "TARGET="+team.addr)
 
-	log.Debug("running exploit", "command", cmd.String(), "team", team.name)
+	slog.Debug("running exploit", "command", cmd.String(), "team", team.name)
 
 	var err error
 
@@ -318,7 +320,7 @@ func runExploitOnTeam(
 	// ignore any error. we will return them later
 
 	if exploit.PrintOutput {
-		log.Debug("exploit produced output", "output", string(output))
+		slog.Debug("exploit produced output", "output", string(output))
 	}
 
 	flags := extractFlags(data.flagRegex, output, exploit, team)
@@ -342,30 +344,28 @@ func warnIfMayLosingFlag(tickLength, exploitTimeout time.Duration, teams, worker
 	timePerExploit := tickLength / time.Duration(teams)
 	timePerTimeout := timePerExploit * time.Duration(workers)
 	if exploitTimeout > timePerTimeout {
-		log.Warnf("╭──────────ATTENTION─────────")
-		log.Warnf("│   YOU MAY BE LOSING FLAGS  ")
-		log.Warnf("│ exploit timeout is too high!!!")
-		log.Warnf("│ %s / %d teams = %s per exploit, for %d workers = %s max timeout (now got %s)",
-			tickLength, teams, timePerExploit, workers, timePerTimeout, exploitTimeout)
-		log.Warnf("│ consider reducing the timeout or increasing the number of workers")
-		log.Warnf("╰────────────────────────────")
+		slog.Warn("╭────────ATTENTION────────")
+		slog.Warn("│   YOU MAY BE LOSING FLAGS  ")
+		slog.Warn("│ exploit timeout is too high!!!")
+		slog.Warn("│", "tickLength", tickLength, "teams", teams, "perExploit", timePerExploit, "workers", workers, "maxTimeout", timePerTimeout, "currentTimeout", exploitTimeout)
+		slog.Warn("│ consider reducing the timeout or increasing the number of workers")
+		slog.Warn("╰────────────────────────")
 	}
 }
 
 func logAttackResults(result collectFlagsResult, teams int) {
 	if result.errored > 0 {
 		percentErr := float32(result.errored) / float32(teams) * 100
-		log.Errorf("some exploits errored: %d (%.2f%%)", result.errored, percentErr)
+		slog.Error("some exploits errored", "count", result.errored, "percent", percentErr)
 	}
 
 	if result.timeout > 0 {
 		percentTout := float32(result.timeout) / float32(teams) * 100
-		log.Warnf("some exploits timed out: %d (%.2f%%)", result.timeout, percentTout)
+		slog.Warn("some exploits timed out", "count", result.timeout, "percent", percentTout)
 	}
 
 	percentAttacked := float32(result.succeeded) / float32(teams) * 100
 	flagsPerTeam := float32(len(result.flags)) / float32(result.succeeded)
 
-	log.Infof("attack finished. attacked %d teams (%.2f%%) and got %d flags (%.2f flags/team)",
-		result.succeeded, percentAttacked, len(result.flags), flagsPerTeam)
+	slog.Info("attack finished", "attacked", result.succeeded, "percentAttacked", percentAttacked, "flags", len(result.flags), "flagsPerTeam", flagsPerTeam)
 }

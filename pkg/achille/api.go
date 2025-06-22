@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-
-	"github.com/charmbracelet/log"
 
 	"github.com/VaiTon/Agamennone/pkg/agamennone"
 	"github.com/VaiTon/Agamennone/pkg/flag"
@@ -39,7 +38,7 @@ func (a *AgamennoneApi) GetConfig() (*agamennone.ClientConfig, error) {
 	err = resp.Body.Close()
 	if err != nil {
 		// do not return error, just log it
-		log.Error("can't close response body", "err", err)
+		slog.Error("can't close response body", "err", err)
 	}
 
 	return config, nil

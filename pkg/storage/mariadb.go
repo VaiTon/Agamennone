@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	charmlog "github.com/charmbracelet/log"
+	"log/slog"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/VaiTon/Agamennone/pkg/flag"
 )
 
-var log = charmlog.WithPrefix("mariadb")
+var log = slog.With("prefix", "mariadb")
 
 type MariaDBStorage struct {
 	db *sql.DB

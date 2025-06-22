@@ -3,13 +3,12 @@ package submitter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/charmbracelet/log"
 
 	"github.com/VaiTon/Agamennone/pkg/flag"
 	"github.com/VaiTon/Agamennone/pkg/storage"
@@ -114,9 +113,6 @@ func (s *Submitter) Submit(ctx context.Context, flags []flag.Flag) ([]Result, er
 }
 
 func (s *Submitter) SubmitLoop(ctx context.Context) {
-	logger := log.WithPrefix("submitter")
-
-	logger.Info("Starting submit loop")
 
 	firstRun := true
 	startTime := time.Now()
@@ -127,7 +123,7 @@ func (s *Submitter) SubmitLoop(ctx context.Context) {
 			elapsedTime := time.Since(startTime)
 			sleepTime := time.Duration(s.submitPeriod)*time.Second - elapsedTime
 
-			logger.Debugf("sleeping for %.2fs", sleepTime.Seconds())
+			slog.Info("the submitter will now sleep", "duration", sleepTime.String())
 			// Sleep for the submission period
 			select {
 			case <-ctx.Done():
@@ -142,27 +138,27 @@ func (s *Submitter) SubmitLoop(ctx context.Context) {
 		// Get all flags from the database that are in the "queued" state
 		flags, err := s.storage.GetByStatus(flag.StatusQueued, 0)
 		if err != nil {
-			logger.Errorf("error getting flags from database: %v", err)
+			slog.Error("error getting flags from database", "err", err)
 			continue
 		}
 
 		// If there are no flags, sleep for a while and try again
 		if len(flags) == 0 {
-			logger.Debugf("no flags to submit")
+			slog.Debug("no flags to submit")
 			continue
 		}
 
 		// try to submit the flags
 		submitTime := time.Now()
-		logger.Debug("starting external script", "submitter", s.path)
+		slog.Debug("starting external script", "submitter", s.path)
 		results, err := s.Submit(ctx, flags)
 		if err != nil {
-			logger.Errorf("error submitting flags: %v", err)
+			slog.Error("error submitting flags", "err", err)
 			continue
 		}
 
 		submitElapsedTime := time.Since(submitTime)
-		logger.Debugf("script exited in %.2fs", submitElapsedTime.Seconds())
+		slog.Debug("script exited", "duration", submitElapsedTime.Seconds())
 
 		// map result to status
 		statuses := make([]string, len(results))
@@ -175,7 +171,7 @@ func (s *Submitter) SubmitLoop(ctx context.Context) {
 			case ResultSkipped:
 				statuses[i] = flag.StatusSkipped
 			default:
-				logger.Printf("Invalid result: %s", result.Result)
+				slog.Warn("Invalid result", "result", result.Result)
 				statuses[i] = flag.StatusQueued
 			}
 		}
@@ -184,10 +180,10 @@ func (s *Submitter) SubmitLoop(ctx context.Context) {
 		for i := range results {
 			err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitTime)
 			if err != nil {
-				logger.Errorf("error updating flag in database: %v", err)
+				slog.Error("error updating flag in database", "err", err)
 			}
 		}
 
-		logger.Infof("submitted %d flags", len(flags))
+		slog.Info("submitted flags", "count", len(flags))
 	}
 }

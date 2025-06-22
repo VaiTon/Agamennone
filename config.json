@@ -1,13 +1,9 @@
 {
-  "gameName": "My Game",
   "flagRegex": "[a-zA-Z0-9]{31}=",
   "flagLifetime": 600,
   "submitterPath": "./submitters/dummy.py",
   "submissionPeriod": 60,
-  "allowedURLs": [
-    "https://example.com",
-    "https://another-example.com"
-  ],
+  "allowedURLs": ["https://example.com", "https://another-example.com"],
   "teams": {
     "team1": "10.0.0.1",
     "team2": "10.0.0.2",

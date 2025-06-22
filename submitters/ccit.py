@@ -13,8 +13,7 @@ res = requests.put(
     json=flags,
 ).json()
 
-# ORDER IS IMPORTANT
-# RULES ARE PROCESSED IN THE ORDER THEY ARE DEFINED
+
 RESULTS = {
     "ACCEPTED": "OK",
     "DENIED": "ERROR",
