@@ -20,7 +20,7 @@ import (
 
 type ServerConfig struct {
 	Store            storage.FlagStorage
-	SubmissionPeriod int
+	SubmissionPeriod time.Duration
 	FlagRegex        *regexp.Regexp
 	FlagLifetime     int
 	Teams            map[string]string
@@ -88,7 +88,7 @@ func (s *Server) Shutdown(ctx context.Context) error { return s.echo.Shutdown(ct
 func (s *Server) getConfig(c echo.Context) error {
 	return c.JSON(http.StatusOK, ClientConfig{
 		FlagFormat:   s.FlagRegex.String(),
-		SubmitPeriod: s.SubmissionPeriod,
+		SubmitPeriod: int(s.SubmissionPeriod / time.Second),
 		FlagLifetime: s.FlagLifetime,
 		Teams:        ClientConfigTeams(s.Teams),
 		DataSources:  []string{}, // TODO: remove this now that we have the proxy

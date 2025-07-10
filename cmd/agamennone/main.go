@@ -142,7 +142,7 @@ func Run(cmd *cobra.Command, args []string) {
 	// Start submit loop
 	slog.Info("starting submitter...", "submitterPath", config.SubmitterPath, "submissionPeriod", config.SubmissionPeriod)
 	s := submitter.NewSubmitter(config.SubmitterPath, config.SubmissionPeriod, store)
-	go s.SubmitLoop(globalCtx)
+	go s.Start(globalCtx)
 	slog.Info("submit loop started successfully")
 
 	// Wait for the interrupt signal

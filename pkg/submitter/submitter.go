@@ -27,31 +27,104 @@ type Result struct {
 }
 
 type Submitter struct {
-	storage storage.FlagStorage
-	path    string
-
-	submitPeriod int
+	storage       storage.FlagStorage // storage for flags
+	submitterPath string              // path to the external submitter script
+	submitPeriod  time.Duration       // period in seconds to wait between submissions
 }
 
 // NewSubmitter creates a new Submitter instance.
-func NewSubmitter(path string, submitPeriod int, storage storage.FlagStorage) *Submitter {
-	return &Submitter{storage: storage, path: path, submitPeriod: submitPeriod}
+func NewSubmitter(path string, submitPeriod time.Duration, storage storage.FlagStorage) *Submitter {
+	return &Submitter{storage: storage, submitterPath: path, submitPeriod: submitPeriod}
 }
 
-// Submit executes the external submitter script with the given flags
+func (s *Submitter) Start(ctx context.Context) {
+	firstRun := true
+	startTime := time.Now()
+
+	for {
+		// If this is not the first run, sleep for the submission period
+		if !firstRun {
+			sleepTime := s.submitPeriod - time.Since(startTime)
+			slog.Info("the submitter will now sleep", "duration", sleepTime.String())
+
+			select {
+			case <-ctx.Done():
+				return // ctx done while sleeping, exit
+			case <-time.After(sleepTime):
+				// continue
+			}
+
+			startTime = time.Now()
+		}
+		firstRun = false
+
+		// Get all flags from the database that are in the "queued" state
+		flags, err := s.storage.GetByStatus(flag.StatusQueued, 0)
+		if err != nil {
+			slog.Error("error getting flags from database", "err", err)
+			continue
+		}
+
+		// If there are no flags, sleep for a while and try again
+		if len(flags) == 0 {
+			slog.Debug("no flags to submit")
+			continue
+		}
+
+		// try to submit the flags
+		submitStartTime := time.Now()
+		slog.Debug("starting external script", "submitter", s.submitterPath)
+
+		results, err := s.submit(ctx, flags)
+		if err != nil {
+			slog.Error("error submitting flags", "err", err)
+			continue
+		}
+
+		slog.Debug("script exited", "duration", time.Since(submitStartTime).Seconds())
+
+		// map result to status
+		statuses := make([]string, len(results))
+		for i, result := range results {
+			switch result.Result {
+			case ResultOk:
+				statuses[i] = flag.StatusAccepted
+			case ResultError:
+				statuses[i] = flag.StatusRejected
+			case ResultSkipped:
+				statuses[i] = flag.StatusSkipped
+			default:
+				slog.Warn("Invalid result", "result", result.Result)
+				statuses[i] = flag.StatusQueued
+			}
+		}
+
+		// Update the status of the flags in the database
+		for i := range results {
+			err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitStartTime)
+			if err != nil {
+				slog.Error("error updating flag in database", "err", err)
+			}
+		}
+
+		slog.Info("submitted flags", "count", len(flags))
+	}
+}
+
+// submit executes the external submitter script with the given flags
 // and returns the results
-func (s *Submitter) Submit(ctx context.Context, flags []flag.Flag) ([]Result, error) {
+func (s *Submitter) submit(ctx context.Context, flags []flag.Flag) ([]Result, error) {
 
 	// check if the path exists and is a file
-	if _, err := os.Stat(s.path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("file %s does not exist", s.path)
-	}
-
-	// check if the file is executable
-	if info, err := os.Stat(s.path); err == nil {
-		if info.Mode()&0111 == 0 {
-			return nil, fmt.Errorf("file %s is not executable", s.path)
-		}
+	fstat, err := os.Stat(s.submitterPath)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("file %s does not exist", s.submitterPath)
+	} else if err != nil {
+		return nil, fmt.Errorf("error checking file %s: %v", s.submitterPath, err)
+	} else if !fstat.Mode().IsRegular() {
+		return nil, fmt.Errorf("path %s is not a regular file", s.submitterPath)
+	} else if fstat.Mode()&0111 == 0 {
+		return nil, fmt.Errorf("file %s is not executable", s.submitterPath)
 	}
 
 	// map flags to a string slice
@@ -61,21 +134,19 @@ func (s *Submitter) Submit(ctx context.Context, flags []flag.Flag) ([]Result, er
 	}
 
 	// execute the file, passing flags via stdin, \n is used as a delimiter
-	cmd := exec.CommandContext(ctx, s.path)
+	cmd := exec.CommandContext(ctx, s.submitterPath)
 	cmd.Stdin = strings.NewReader(strings.Join(flagsTxts, "\n"))
 
 	// capture and parse the output
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("error capturing output: %v. output was: %s", err, string(output))
+	} else if len(output) == 0 {
+		return nil, fmt.Errorf("submitter returned an empty output")
 	}
 
 	// check the result: for each line in the output, check if it's OK, ERROR or SKIPPED
 	results := make([]Result, 0, len(flags))
-
-	if len(output) == 0 {
-		return nil, fmt.Errorf("submitter returned an empty output")
-	}
 
 	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
@@ -110,80 +181,4 @@ func (s *Submitter) Submit(ctx context.Context, flags []flag.Flag) ([]Result, er
 	}
 
 	return results, nil
-}
-
-func (s *Submitter) SubmitLoop(ctx context.Context) {
-
-	firstRun := true
-	startTime := time.Now()
-
-	for {
-		// If this is not the first run, sleep for the submission period
-		if !firstRun {
-			elapsedTime := time.Since(startTime)
-			sleepTime := time.Duration(s.submitPeriod)*time.Second - elapsedTime
-
-			slog.Info("the submitter will now sleep", "duration", sleepTime.String())
-			// Sleep for the submission period
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(sleepTime):
-			}
-
-			startTime = time.Now()
-		}
-		firstRun = false
-
-		// Get all flags from the database that are in the "queued" state
-		flags, err := s.storage.GetByStatus(flag.StatusQueued, 0)
-		if err != nil {
-			slog.Error("error getting flags from database", "err", err)
-			continue
-		}
-
-		// If there are no flags, sleep for a while and try again
-		if len(flags) == 0 {
-			slog.Debug("no flags to submit")
-			continue
-		}
-
-		// try to submit the flags
-		submitTime := time.Now()
-		slog.Debug("starting external script", "submitter", s.path)
-		results, err := s.Submit(ctx, flags)
-		if err != nil {
-			slog.Error("error submitting flags", "err", err)
-			continue
-		}
-
-		submitElapsedTime := time.Since(submitTime)
-		slog.Debug("script exited", "duration", submitElapsedTime.Seconds())
-
-		// map result to status
-		statuses := make([]string, len(results))
-		for i, result := range results {
-			switch result.Result {
-			case ResultOk:
-				statuses[i] = flag.StatusAccepted
-			case ResultError:
-				statuses[i] = flag.StatusRejected
-			case ResultSkipped:
-				statuses[i] = flag.StatusSkipped
-			default:
-				slog.Warn("Invalid result", "result", result.Result)
-				statuses[i] = flag.StatusQueued
-			}
-		}
-
-		// Update the status of the flags in the database
-		for i := range results {
-			err = s.storage.UpdateSentFlag(flags[i].Flag, statuses[i], results[i].Message, submitTime)
-			if err != nil {
-				slog.Error("error updating flag in database", "err", err)
-			}
-		}
-
-		slog.Info("submitted flags", "count", len(flags))
-	}
 }

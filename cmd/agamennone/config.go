@@ -4,19 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 type FileConfig struct {
-	GameName         string            `json:"gameName"`
-	FlagRegexStr     string            `json:"flagRegex"`
-	SubmissionPeriod int               `json:"submissionPeriod"`
-	FlagLifetime     int               `json:"flagLifetime"`
-	ServerHost       string            `json:"serverHost"`
-	ServerPort       int               `json:"serverPort"`
-	Teams            map[string]string `json:"teams"`
-	SubmitterPath    string            `json:"submitterPath"`
-	DataSources      []string          `json:"dataSources"`
-	AllowedURLs      []string          `json:"allowedURLs"`
+	GameName     string            `json:"gameName"`
+	FlagRegexStr string            `json:"flagRegex"`
+	FlagLifetime int               `json:"flagLifetime"`
+	ServerHost   string            `json:"serverHost"`
+	ServerPort   int               `json:"serverPort"`
+	Teams        map[string]string `json:"teams"`
+	DataSources  []string          `json:"dataSources"`
+	AllowedURLs  []string          `json:"allowedURLs"`
+
+	SubmitterPath       string `json:"submitterPath"`
+	SubmissionPeriodStr string `json:"submissionPeriod"`
+	SubmissionPeriod    time.Duration
 }
 
 func loadConfig(path string) (serverConfig *FileConfig, err error) {
@@ -34,6 +37,14 @@ func loadConfig(path string) (serverConfig *FileConfig, err error) {
 	err = file.Close()
 	if err != nil {
 		return nil, fmt.Errorf("error closing config file: %v", err)
+	}
+
+	if serverConfig.SubmissionPeriodStr != "" {
+		submissionPeriod, err := time.ParseDuration(serverConfig.SubmissionPeriodStr)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing submission period: %v", err)
+		}
+		serverConfig.SubmissionPeriod = submissionPeriod
 	}
 
 	return
