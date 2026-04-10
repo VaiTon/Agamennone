@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -v -o agamennone ./cmd/agamennone
 
 FROM alpine:${ALPINE_VERSION}
+RUN apk add --no-cache ca-certificates py3-requests
 WORKDIR /app
 COPY --from=builder /build/agamennone /usr/local/bin/agamennone
 ENTRYPOINT [ "agamennone" ]
