@@ -61,8 +61,6 @@ func init() {
 	pFlags.BoolVarP(&exploitOutput, "output", "o", false, "Print the exploit output")
 	pFlags.IntVarP(&timeout, "timeout", "t", 10, "Timeout for the exploit in seconds")
 	pFlags.IntVarP(&workers, "workers", "w", 4, "Number of workers to use for the exploit")
-
-	rootCmd.AddCommand(createCmd)
 }
 
 func main() {
