@@ -38,7 +38,7 @@ services:
     depends_on:
       - db
     ports:
-      - "${EXPOSE_HOST}:3000:3000"
+      - "${EXPOSE_HOST}:5000:3000"
     environment:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
